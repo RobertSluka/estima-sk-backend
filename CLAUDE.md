@@ -112,7 +112,7 @@ docker compose exec db pg_dump -U estima_sk estima_sk > backup_$(date +%F).sql
 - Mix sale and rent data in any aggregate or feature set.
 - Touch the CZ sibling repos (`estima-backend`, `estima-frontend`, etc.) while
   working here.
-- `git push` unless explicitly asked (repo is not yet a git repository).
+- `git push` unless explicitly asked (origin: github.com/RobertSluka/estima-sk-backend, private).
 
 ## Required workflow
 
