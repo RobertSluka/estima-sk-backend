@@ -1,0 +1,626 @@
+<!DOCTYPE html>
+<html lang="{{ lang }}">
+<head>
+<meta charset="utf-8">
+<title>{{ r.meta.brand }} — {{ T.report_title }}</title>
+<style>
+  /* ------------------------------------------------------------------ *
+   *  Page setup — A4, with a running footer on every page.             *
+   * ------------------------------------------------------------------ */
+  @page {
+    size: A4;
+    margin: 18mm 16mm 20mm 16mm;
+    @bottom-left {
+      content: "{{ r.meta.brand }} · {{ T.tagline }}";
+      font-size: 7.5pt;
+      color: #9aa5b1;
+    }
+    @bottom-right {
+      content: "Page " counter(page) " / " counter(pages);
+      font-size: 7.5pt;
+      color: #9aa5b1;
+    }
+  }
+  @page :first {
+    margin: 0;             /* full-bleed cover */
+    @bottom-left { content: ""; }
+    @bottom-right { content: ""; }
+  }
+
+  :root {
+    --ink:        #1d2733;
+    --ink-soft:   #55616e;
+    --muted:      #8a95a1;
+    --line:       #e3e8ee;
+    --panel:      #f6f8fa;
+    --brand:      #123a5e;
+    --brand-2:    #1f6f8b;
+    --accent:     #c9a227;
+    --good:       #1f8a54;
+    --good-bg:    #e7f5ee;
+    --warn:       #b9821b;
+    --warn-bg:    #fbf2df;
+    --bad:        #c0392b;
+    --bad-bg:     #fcecea;
+    --info:       #1f6f8b;
+    --info-bg:    #e8f2f6;
+  }
+
+  * { box-sizing: border-box; }
+  html { -weasy-hyphens: auto; }
+  body {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    font-size: 10pt;
+    line-height: 1.5;
+    margin: 0;
+  }
+  h1, h2, h3 { margin: 0; font-weight: 700; }
+  p { margin: 0 0 6pt; }
+  a { color: var(--brand-2); text-decoration: none; word-break: break-all; }
+  table { width: 100%; border-collapse: collapse; }
+
+  /* ------------------------------------------------------------------ *
+   *  Section scaffolding                                               *
+   * ------------------------------------------------------------------ */
+  .section { margin-top: 20pt; }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    gap: 8pt;
+    border-bottom: 2px solid var(--brand);
+    padding-bottom: 5pt;
+    margin-bottom: 12pt;
+  }
+  .section-num {
+    font-size: 9pt;
+    font-weight: 700;
+    color: #fff;
+    background: var(--brand);
+    border-radius: 3px;
+    padding: 1.5pt 6pt;
+  }
+  .section-title { font-size: 13pt; color: var(--brand); letter-spacing: .2px; }
+  .page-break { page-break-before: always; }
+  .avoid-break { page-break-inside: avoid; }
+
+  .muted { color: var(--muted); }
+  .soft  { color: var(--ink-soft); }
+  .fallback {
+    color: var(--muted);
+    font-style: italic;
+    background: var(--panel);
+    border: 1px dashed var(--line);
+    border-radius: 6px;
+    padding: 10pt 12pt;
+    font-size: 9.5pt;
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  1 · Cover                                                          *
+   * ------------------------------------------------------------------ */
+  .cover {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    color: #fff;
+    background: linear-gradient(160deg, #0d2f4d 0%, #123a5e 45%, #1f6f8b 100%);
+    padding: 22mm 18mm 16mm 18mm;
+  }
+  .cover-top { display: flex; justify-content: space-between; align-items: flex-start; }
+  .brand-mark { font-size: 22pt; font-weight: 800; letter-spacing: 1px; }
+  .brand-mark .dot { color: var(--accent); }
+  .brand-tag { font-size: 8.5pt; letter-spacing: 3px; text-transform: uppercase; color: #b9d4e4; margin-top: 2pt; }
+  .cover-kicker { font-size: 9pt; letter-spacing: 2px; text-transform: uppercase; color: #9ec7dd; }
+
+  .cover-img-wrap {
+    margin: 16pt 0;
+    border-radius: 10px;
+    overflow: hidden;
+    height: 78mm;
+    border: 1px solid rgba(255,255,255,.18);
+  }
+  .cover-img { width: 100%; height: 100%; object-fit: cover; }
+
+  .cover-title { font-size: 26pt; line-height: 1.15; margin-top: 6pt; }
+  .cover-locality { font-size: 12pt; color: #cfe3ee; margin-top: 6pt; }
+  .cover-spacer { flex: 1; }
+
+  .badge-strip {
+    display: flex;
+    gap: 10pt;
+    margin-top: 14pt;
+  }
+  .badge-card {
+    flex: 1;
+    background: rgba(255,255,255,.10);
+    border: 1px solid rgba(255,255,255,.20);
+    border-radius: 8px;
+    padding: 10pt 12pt;
+  }
+  .badge-card .label { font-size: 7.5pt; letter-spacing: 1.5px; text-transform: uppercase; color: #b9d4e4; }
+  .badge-card .value { font-size: 14pt; font-weight: 700; margin-top: 3pt; }
+  .verdict-pill {
+    display: inline-block;
+    font-size: 12pt;
+    font-weight: 700;
+    padding: 4pt 12pt;
+    border-radius: 20px;
+    margin-top: 3pt;
+  }
+  .cover-foot { font-size: 8pt; color: #9ec7dd; margin-top: 16pt; }
+
+  /* verdict colours (used on cover + inline) */
+  .v-undervalued { background: var(--good-bg); color: var(--good); }
+  .v-fair        { background: var(--info-bg); color: var(--info); }
+  .v-overpriced  { background: var(--bad-bg);  color: var(--bad); }
+  .v-unknown     { background: var(--panel);   color: var(--muted); }
+
+  /* ------------------------------------------------------------------ *
+   *  Cards, key-value grids                                            *
+   * ------------------------------------------------------------------ */
+  .kv-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .kv {
+    display: flex;
+    justify-content: space-between;
+    gap: 10pt;
+    padding: 7pt 12pt;
+    border-bottom: 1px solid var(--line);
+  }
+  .kv:nth-child(odd) { border-right: 1px solid var(--line); }
+  .kv .k { color: var(--muted); font-size: 9pt; }
+  .kv .v { font-weight: 600; text-align: right; }
+
+  .cards { display: flex; gap: 10pt; }
+  .card {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 11pt 13pt;
+  }
+  .card .label { font-size: 7.5pt; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); }
+  .card .big { font-size: 15pt; font-weight: 700; margin-top: 3pt; }
+  .card .sub { font-size: 8.5pt; color: var(--ink-soft); margin-top: 2pt; }
+
+  .callout {
+    background: var(--info-bg);
+    border-left: 3px solid var(--brand-2);
+    border-radius: 4px;
+    padding: 9pt 12pt;
+    margin-top: 12pt;
+    font-size: 9.5pt;
+    color: var(--ink);
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  Tables                                                            *
+   * ------------------------------------------------------------------ */
+  .data-table { font-size: 8.6pt; margin-top: 4pt; }
+  .data-table th {
+    text-align: left;
+    background: var(--brand);
+    color: #fff;
+    padding: 6pt 7pt;
+    font-weight: 600;
+    font-size: 8pt;
+  }
+  .data-table td { padding: 6pt 7pt; border-bottom: 1px solid var(--line); }
+  .data-table tr.subject-row td { background: var(--warn-bg); font-weight: 700; }
+  .data-table tr.median-row td { background: var(--panel); font-style: italic; }
+  .data-table .num { text-align: right; white-space: nowrap; }
+  .pos { color: var(--good); }
+  .neg { color: var(--bad); }
+
+  /* ------------------------------------------------------------------ *
+   *  Score badges / bars                                               *
+   * ------------------------------------------------------------------ */
+  .score-row { display: flex; gap: 10pt; margin: 4pt 0 2pt; }
+  .score-badge {
+    flex: 1;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 9pt 11pt;
+    text-align: center;
+    background: #fff;
+  }
+  .score-badge .n { font-size: 17pt; font-weight: 800; color: var(--brand); }
+  .score-badge .n small { font-size: 8pt; color: var(--muted); font-weight: 600; }
+  .score-badge .l { font-size: 7.5pt; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); margin-top: 2pt; }
+
+  .bar { height: 5pt; background: var(--line); border-radius: 3px; margin-top: 6pt; overflow: hidden; }
+  .bar > span { display: block; height: 100%; background: var(--brand-2); }
+
+  .cond-chip {
+    display: inline-block;
+    font-size: 8pt;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    padding: 2pt 8pt;
+    border-radius: 12px;
+  }
+
+  /* ------------------------------------------------------------------ *
+   *  Vision image blocks                                               *
+   * ------------------------------------------------------------------ */
+  .vimg { display: flex; gap: 12pt; margin-top: 12pt; }
+  .vimg .thumb {
+    width: 62mm; height: 44mm; flex: none;
+    border-radius: 8px; overflow: hidden; border: 1px solid var(--line);
+  }
+  .vimg .thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .vimg .meta { flex: 1; }
+  .vimg .room {
+    display: inline-block; font-size: 8pt; font-weight: 700; text-transform: capitalize;
+    background: var(--info-bg); color: var(--info); padding: 2pt 8pt; border-radius: 12px;
+  }
+  .metric-line { display: flex; gap: 6pt; align-items: center; margin-top: 5pt; font-size: 8.5pt; }
+  .metric-line .ml-label { width: 20mm; color: var(--muted); }
+  .metric-line .bar { flex: 1; margin-top: 0; }
+
+  /* ------------------------------------------------------------------ *
+   *  Location facilities                                               *
+   * ------------------------------------------------------------------ */
+  .map-box {
+    height: 55mm; border-radius: 8px; overflow: hidden;
+    border: 1px solid var(--line); background: var(--panel);
+    display: flex; align-items: center; justify-content: center; color: var(--muted);
+    font-size: 9pt; margin-bottom: 12pt;
+  }
+  .map-box img { width: 100%; height: 100%; object-fit: cover; }
+  .poi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10pt; }
+  .poi {
+    border: 1px solid var(--line); border-radius: 8px; padding: 10pt 12pt; background: #fff;
+  }
+  .poi .icon { font-size: 13pt; }
+  .poi .n { font-size: 15pt; font-weight: 800; color: var(--brand); }
+  .poi .l { font-size: 8pt; color: var(--muted); }
+  .poi .r { font-size: 7pt; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+  .nearest-head {
+    margin: 12pt 0 6pt; font-size: 7.5pt; font-weight: 700; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .5px;
+  }
+  .nearest-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8pt; }
+  .nearest {
+    display: flex; gap: 7pt; align-items: center;
+    border: 1px solid var(--line); border-radius: 8px; padding: 7pt 9pt; background: #fff;
+  }
+  .nearest .ni {
+    width: 16pt; height: 16pt; flex: none; border-radius: 50%;
+    background: var(--info-bg); color: var(--brand-2);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .nearest .ni svg { width: 9pt; height: 9pt; }
+  .nearest .nn {
+    font-size: 8.5pt; font-weight: 700; color: var(--ink);
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .nearest .nt { min-width: 0; }
+  .nearest .nd { font-size: 7.5pt; color: var(--muted); }
+
+  /* ------------------------------------------------------------------ *
+   *  Recommendation                                                   *
+   * ------------------------------------------------------------------ */
+  .rec-summary {
+    background: var(--brand); color: #fff; border-radius: 8px; padding: 14pt 16pt;
+    font-size: 10.5pt; line-height: 1.55;
+  }
+  .rec-cols { display: flex; gap: 10pt; margin-top: 12pt; }
+  .rec-col { flex: 1; border: 1px solid var(--line); border-radius: 8px; padding: 11pt 13pt; }
+  .rec-col h3 { font-size: 9.5pt; margin-bottom: 6pt; }
+  .rec-col.strengths h3 { color: var(--good); }
+  .rec-col.risks h3 { color: var(--bad); }
+  .rec-col.steps h3 { color: var(--brand-2); }
+  .rec-col ul { margin: 0; padding-left: 14pt; }
+  .rec-col li { font-size: 9pt; margin-bottom: 4pt; }
+
+  .disclaimer {
+    margin-top: 20pt; padding-top: 8pt; border-top: 1px solid var(--line);
+    font-size: 7.5pt; color: var(--muted); line-height: 1.4;
+  }
+</style>
+</head>
+<body>
+
+{# ==================================================================== #}
+{# 1 · COVER                                                            #}
+{# ==================================================================== #}
+{% set v = (r.market_analysis.valuation_label.value if r.market_analysis.valuation_label else "unknown") %}
+<section class="cover">
+  <div class="cover-top">
+    <div>
+      <div class="brand-mark">{{ r.meta.brand }}<span class="dot">.</span></div>
+      <div class="brand-tag">{{ T.tagline }}</div>
+    </div>
+    <div style="text-align:right">
+      <div class="cover-kicker">{{ T.report_title }}</div>
+      <div style="font-size:9pt; color:#cfe3ee; margin-top:4pt">{{ r.meta.generated_at | date(lang) }}</div>
+      {% if r.meta.report_id %}<div style="font-size:8pt; color:#9ec7dd">{{ T.ref }} {{ r.meta.report_id }}</div>{% endif %}
+    </div>
+  </div>
+
+  <div class="cover-img-wrap">
+    <img class="cover-img" src="{{ (r.property.image_urls[0] if r.property.image_urls else None) | embed_image }}" alt="">
+  </div>
+
+  <h1 class="cover-title">{{ r.property.title | dash(T.fb_untitled) }}</h1>
+  <div class="cover-locality">{{ r.property.locality | dash(T.fb_no_locality) }}{% if r.property.property_type %} · {{ r.property.property_type }}{% endif %}{% if r.property.layout %} · {{ r.property.layout }}{% endif %}</div>
+
+  <div class="cover-spacer"></div>
+
+  <div class="badge-strip">
+    <div class="badge-card">
+      <div class="label">{{ T.assessment }}</div>
+      <span class="verdict-pill v-{{ v }}">
+        {% if v == "undervalued" %}{{ T.undervalued }}{% elif v == "fair" %}{{ T.fairly_priced }}{% elif v == "overpriced" %}{{ T.overpriced }}{% else %}{{ T.not_assessed }}{% endif %}
+      </span>
+    </div>
+    <div class="badge-card">
+      <div class="label">{{ T.est_market_value }}</div>
+      <div class="value">{{ r.market_analysis.estimated_value | money(r.property.currency) }}</div>
+    </div>
+    <div class="badge-card">
+      <div class="label">{{ T.vs_asking }}</div>
+      <div class="value">{{ r.market_analysis.price_difference | signed_money(r.property.currency) }}
+        {% if r.market_analysis.price_difference_percent is not none %}
+          <span style="font-size:9pt; font-weight:600; color:#cfe3ee">({{ r.market_analysis.price_difference_percent | pct(1, true) }})</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  <div class="cover-foot">{{ T.asking_price }} {{ r.property.price | money(r.property.currency) }}
+    {% if r.property.price_per_sqm %} · {{ r.property.price_per_sqm | num(0) }} {{ r.property.currency }}/m²{% endif %}
+    {% if r.property.source %} · {{ T.source }}: {{ r.property.source }}{% endif %}
+  </div>
+</section>
+
+{# ==================================================================== #}
+{# 2 · PROPERTY METADATA                                                #}
+{# ==================================================================== #}
+<section class="section">
+  <div class="section-head"><span class="section-num">01</span><h2 class="section-title">{{ T.sec_details }}</h2></div>
+  {% set dt = (r.property.deal_type.value if r.property.deal_type else None) %}
+  <div class="kv-grid">
+    <div class="kv"><span class="k">{{ T.m_address }}</span><span class="v">{{ r.property.address | dash(r.property.locality | dash) }}</span></div>
+    <div class="kv"><span class="k">{{ T.m_type }}</span><span class="v">{{ r.property.property_type | dash }}</span></div>
+    <div class="kv"><span class="k">{{ T.m_deal }}</span><span class="v">{% if dt == "sale" %}{{ T.sale }}{% elif dt == "rent" %}{{ T.rent }}{% else %}—{% endif %}</span></div>
+    <div class="kv"><span class="k">{{ T.m_layout }}</span><span class="v">{{ r.property.layout | dash }}</span></div>
+    <div class="kv"><span class="k">{{ T.m_floor_area }}</span><span class="v">{{ r.property.floor_area | num(0, " m²") }}</span></div>
+    <div class="kv"><span class="k">{{ T.m_land_area }}</span><span class="v">{{ r.property.land_area | num(0, " m²") }}</span></div>
+    <div class="kv"><span class="k">{{ T.m_floor }}</span><span class="v">{{ r.property.floor | dash }}</span></div>
+    <div class="kv"><span class="k">{{ T.m_asking }}</span><span class="v">{{ r.property.price | money(r.property.currency) }}</span></div>
+    <div class="kv"><span class="k">{{ T.m_psqm }}</span><span class="v">{{ r.property.price_per_sqm | num(0, " " ~ r.property.currency ~ "/m²") }}</span></div>
+    <div class="kv"><span class="k">{{ T.m_source }}</span><span class="v">{{ r.property.source | dash }}</span></div>
+    <div class="kv"><span class="k">{{ T.m_first_seen }}</span><span class="v">{{ r.property.first_seen_at | date(lang) }}</span></div>
+    <div class="kv"><span class="k">{{ T.m_last_seen }}</span><span class="v">{{ r.property.last_seen_at | date(lang) }}</span></div>
+    <div class="kv"><span class="k">{{ T.m_days }}</span><span class="v">{{ r.property.days_on_market | dash }}</span></div>
+    <div class="kv"><span class="k">{{ T.m_reference }}</span><span class="v">{% if r.property.source_url %}<a href="{{ r.property.source_url }}">{{ T.listing_link }}</a>{% else %}—{% endif %}</span></div>
+  </div>
+</section>
+
+{# ==================================================================== #}
+{# 3 · MARKET ANALYSIS                                                  #}
+{# ==================================================================== #}
+<section class="section">
+  <div class="section-head"><span class="section-num">02</span><h2 class="section-title">{{ T.sec_market }}</h2></div>
+
+  <div class="cards">
+    <div class="card">
+      <div class="label">{{ T.est_fair_value }}</div>
+      <div class="big">{{ r.market_analysis.estimated_value | money(r.property.currency) }}</div>
+      <div class="sub">{{ T.range }} {{ r.market_analysis.estimated_low | money(r.property.currency) }} – {{ r.market_analysis.estimated_high | money(r.property.currency) }}</div>
+    </div>
+    <div class="card">
+      <div class="label">{{ T.local_median }}</div>
+      <div class="big">{{ r.market_analysis.local_median_price | money(r.property.currency) }}</div>
+      <div class="sub">{{ T.median_psqm }}: {{ r.market_analysis.local_median_price_per_sqm | num(0, " " ~ r.property.currency ~ "/m²") }}</div>
+    </div>
+    <div class="card">
+      <div class="label">{{ T.asking_vs_est }}</div>
+      <div class="big {% if r.market_analysis.price_difference and r.market_analysis.price_difference < 0 %}pos{% elif r.market_analysis.price_difference and r.market_analysis.price_difference > 0 %}neg{% endif %}">
+        {{ r.market_analysis.price_difference_percent | pct(1, true) }}
+      </div>
+      <div class="sub">{{ r.market_analysis.price_difference | signed_money(r.property.currency) }}</div>
+    </div>
+  </div>
+
+  {% if r.market_analysis.explanation %}
+  <div class="callout">{{ r.market_analysis.explanation }}</div>
+  {% endif %}
+
+  {% if r.benchmarks %}
+  <div class="callout avoid-break" style="margin-top:8pt">
+    <strong>{{ T.benchmark_title }}:</strong>
+    {% for b in r.benchmarks %}
+      {{ b.name | dash }}{% if b.scope or b.period %} ({{ [b.scope, b.period] | select | join(", ") }}){% endif %}:
+      <strong>{{ b.value_per_sqm | num(0, " " ~ b.unit) }}</strong>{% if not loop.last %} · {% endif %}
+    {% endfor %}
+    <div class="muted" style="font-size:7.5pt; margin-top:2pt">{{ T.benchmark_note }}</div>
+  </div>
+  {% endif %}
+
+  <h3 style="font-size:10pt; color:var(--brand); margin-top:16pt; margin-bottom:4pt">{{ T.comparables }}</h3>
+  {% if r.comparables %}
+  <table class="data-table avoid-break">
+    <thead>
+      <tr>
+        <th>{{ T.th_property }}</th><th>{{ T.th_locality }}</th><th>{{ T.th_layout }}</th>
+        <th class="num">{{ T.th_area }}</th><th class="num">{{ T.th_price }}</th><th class="num">{{ T.th_psqm }}</th>
+        <th class="num">{{ T.th_delta }}</th><th class="num">{{ T.th_similarity }}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in r.comparables %}
+      <tr class="{% if c.is_subject %}subject-row{% elif c.is_median %}median-row{% endif %}">
+        <td>{{ c.label | dash }}</td>
+        <td>{{ c.locality | dash }}</td>
+        <td>{{ c.layout | dash }}</td>
+        <td class="num">{{ c.floor_area | num(0, " m²") }}</td>
+        <td class="num">{{ c.price | money(r.property.currency) }}</td>
+        <td class="num">{{ c.price_per_sqm | num(0) }}</td>
+        <td class="num {% if c.price_difference_vs_subject and c.price_difference_vs_subject < 0 %}neg{% elif c.price_difference_vs_subject and c.price_difference_vs_subject > 0 %}pos{% endif %}">
+          {% if c.is_subject %}—{% else %}{{ c.price_difference_vs_subject | signed_money(r.property.currency) }}{% endif %}
+        </td>
+        <td class="num">{% if c.is_subject %}—{% else %}{{ c.similarity_score | num(0, " %") }}{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted" style="font-size:7.5pt; margin-top:5pt">{{ T.comp_footnote }}</p>
+  {% else %}
+  <div class="fallback">{{ T.fb_no_comparables }}</div>
+  {% endif %}
+</section>
+
+{# ==================================================================== #}
+{# 4 · LISTING PHOTO QUALITY                                            #}
+{# Measurable photo statistics only — never a claim about the property's #}
+{# condition, and never a price adjustment (that relationship belongs to #}
+{# the trained valuation model, not hand-written rules).                 #}
+{# ==================================================================== #}
+<section class="section page-break">
+  <div class="section-head"><span class="section-num">03</span><h2 class="section-title">{{ T.sec_vision }}</h2></div>
+
+  {% if r.vision_analysis.available %}
+  <div class="score-row">
+    <div class="score-badge"><div class="n">{{ r.vision_analysis.visual_quality_score | num(0) }}<small>/100</small></div><div class="l">{{ T.photo_quality }}</div></div>
+    <div class="score-badge"><div class="n">{{ r.vision_analysis.brightness_score | num(0) }}<small>/100</small></div><div class="l">{{ T.brightness }}</div></div>
+    <div class="score-badge"><div class="n">{{ r.vision_analysis.sharpness_score | num(0) }}<small>/100</small></div><div class="l">{{ T.sharpness }}</div></div>
+    <div class="score-badge"><div class="n">{{ r.vision_analysis.gallery_size | num(0) }}</div><div class="l">{{ T.gallery_photos }}</div></div>
+  </div>
+
+  <div class="callout">
+    {{ r.vision_analysis.summary | dash(T.fb_vision_summary) }}
+    {% if r.vision_analysis.confidence is not none %}
+      <span class="muted">({{ T.confidence }}: {{ (r.vision_analysis.confidence * 100) | num(0) }}%.)</span>
+    {% endif %}
+  </div>
+
+  {% if r.vision_analysis.observations %}
+  <p class="soft" style="font-weight:600; margin-top:8pt">{{ T.observations }}</p>
+  <ul class="soft" style="font-size:9pt; margin-top:4pt">
+    {% for obs in r.vision_analysis.observations %}<li>{{ obs }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+
+  <p class="muted" style="font-size:7.5pt; margin-top:8pt">{{ T.vision_footnote }}</p>
+
+  {% else %}
+  <div class="fallback">{{ T.fb_no_vision }}</div>
+  {% endif %}
+</section>
+
+{# ==================================================================== #}
+{# 5 · LOCATION CONTEXT                                                 #}
+{# ==================================================================== #}
+{# Inline stroke icons for the nearest-facility chips (WeasyPrint renders
+   inline SVG; colour comes from .nearest .ni via currentColor). #}
+{% macro poi_icon(category) %}
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  {% if category == "transport" %}
+  <rect x="5" y="3" width="14" height="13" rx="2"/><path d="M5 10h14"/><path d="M8 20l-1 2M16 20l1 2"/><path d="M9 16v4h6v-4"/>
+  {% elif category == "grocery" %}
+  <circle cx="9" cy="21" r="1"/><circle cx="19" cy="21" r="1"/><path d="M2 3h3l2.7 12.4a2 2 0 0 0 2 1.6h8.7a2 2 0 0 0 2-1.6L22 7H6"/>
+  {% elif category == "schools" %}
+  <path d="M22 9 12 4 2 9l10 5 10-5z"/><path d="M6 11.5V16c0 1.5 2.7 3 6 3s6-1.5 6-3v-4.5"/>
+  {% elif category == "parks" %}
+  <path d="M12 3 6.5 10h2L4 16h16l-4.5-6h2L12 3z"/><path d="M12 16v5"/>
+  {% elif category == "restaurants" %}
+  <path d="M5 2v7a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2V2"/><path d="M7.5 2v20"/><path d="M18 2c-2 2.5-2.5 5.5-2.5 8.5 0 1.8 1 3 2.5 3v8.5"/>
+  {% else %}
+  <circle cx="12" cy="12" r="9.5"/><path d="M12 8v8M8 12h8"/>
+  {% endif %}
+</svg>
+{% endmacro %}
+<section class="section page-break">
+  <div class="section-head"><span class="section-num">04</span><h2 class="section-title">{{ T.sec_location }}</h2></div>
+  {% if r.location_analysis.available %}
+  <div class="map-box">
+    {% if r.location_analysis.static_map_url %}
+      <img src="{{ r.location_analysis.static_map_url | embed_image }}" alt="Map">
+    {% elif r.property.lat and r.property.lon %}
+      {{ T.map_preview }} · {{ r.property.lat | num(4) }}, {{ r.property.lon | num(4) }}
+    {% else %}
+      {{ T.map_unavailable }}
+    {% endif %}
+  </div>
+
+  <div class="poi-grid">
+    <div class="poi"><div class="n">{{ r.location_analysis.nearby_transport_count_500m | dash("0") }}</div><div class="l">{{ T.poi_transport }}</div><div class="r">{{ T.within_500m }}</div></div>
+    <div class="poi"><div class="n">{{ r.location_analysis.nearby_grocery_count_500m | dash("0") }}</div><div class="l">{{ T.poi_grocery }}</div><div class="r">{{ T.within_500m }}</div></div>
+    <div class="poi"><div class="n">{{ r.location_analysis.nearby_schools_count_1km | dash("0") }}</div><div class="l">{{ T.poi_schools }}</div><div class="r">{{ T.within_1km }}</div></div>
+    <div class="poi"><div class="n">{{ r.location_analysis.nearby_parks_count_1km | dash("0") }}</div><div class="l">{{ T.poi_parks }}</div><div class="r">{{ T.within_1km }}</div></div>
+    <div class="poi"><div class="n">{{ r.location_analysis.nearby_restaurants_count_1km | dash("0") }}</div><div class="l">{{ T.poi_restaurants }}</div><div class="r">{{ T.within_1km }}</div></div>
+    <div class="poi"><div class="n">{{ r.location_analysis.nearby_healthcare_count_1km | dash("0") }}</div><div class="l">{{ T.poi_healthcare }}</div><div class="r">{{ T.within_1km }}</div></div>
+  </div>
+
+  {% if r.location_analysis.nearest_facilities %}
+  <div class="nearest-head">{{ T.nearest_facilities }}</div>
+  <div class="nearest-grid">
+    {% for f in r.location_analysis.nearest_facilities %}
+    <div class="nearest">
+      <div class="ni">{{ poi_icon(f.category) }}</div>
+      <div class="nt">
+        <div class="nn">{{ f.name }}</div>
+        <div class="nd">{{ T["poi_" ~ f.category] | dash }} · {{ f.distance_m | dist }} · {{ f.distance_m | walk_min }} {{ T.min_walk }}</div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  {% if r.location_analysis.location_score is not none %}
+  <div class="cards" style="margin-top:12pt">
+    <div class="card"><div class="label">{{ T.location_score }}</div><div class="big">{{ r.location_analysis.location_score | num(0) }}<span style="font-size:9pt;color:var(--muted)">/100</span></div>
+      <div class="bar"><span style="width: {{ r.location_analysis.location_score | default(0, true) }}%"></span></div>
+    </div>
+  </div>
+  {% endif %}
+
+  {% if r.location_analysis.explanation %}
+  <div class="callout">{{ r.location_analysis.explanation }}</div>
+  {% endif %}
+  {% else %}
+  <div class="fallback">{{ T.fb_no_location }}{% if not (r.property.lat and r.property.lon) %}{{ T.fb_no_location_coords }}{% endif %}{{ T.fb_no_location_tail }}</div>
+  {% endif %}
+</section>
+
+{# ==================================================================== #}
+{# 7 · FINAL RECOMMENDATION                                             #}
+{# ==================================================================== #}
+<section class="section avoid-break">
+  <div class="section-head"><span class="section-num">05</span><h2 class="section-title">{{ T.sec_recommendation }}</h2></div>
+  <div class="rec-summary">
+    {{ r.recommendation.summary | dash(T.fb_rec_summary) }}
+    {% if r.recommendation.attractiveness %}<div style="margin-top:8pt; font-weight:700; color:var(--accent)">{{ r.recommendation.attractiveness }}</div>{% endif %}
+  </div>
+
+  <div class="rec-cols">
+    <div class="rec-col strengths">
+      <h3>{{ T.strengths }}</h3>
+      {% if r.recommendation.strengths %}<ul>{% for s in r.recommendation.strengths %}<li>{{ s }}</li>{% endfor %}</ul>{% else %}<p class="muted" style="font-size:8.5pt">{{ T.none_identified }}</p>{% endif %}
+    </div>
+    <div class="rec-col risks">
+      <h3>{{ T.risks }}</h3>
+      {% if r.recommendation.risks %}<ul>{% for s in r.recommendation.risks %}<li>{{ s }}</li>{% endfor %}</ul>{% else %}<p class="muted" style="font-size:8.5pt">{{ T.none_identified }}</p>{% endif %}
+    </div>
+    <div class="rec-col steps">
+      <h3>{{ T.next_steps }}</h3>
+      {% if r.recommendation.next_steps %}<ul>{% for s in r.recommendation.next_steps %}<li>{{ s }}</li>{% endfor %}</ul>{% else %}<p class="muted" style="font-size:8.5pt">{{ T.none_identified }}</p>{% endif %}
+    </div>
+  </div>
+
+  <div class="disclaimer">{{ r.meta.disclaimer }}</div>
+</section>
+
+</body>
+</html>

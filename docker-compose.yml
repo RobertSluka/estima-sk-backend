@@ -1,0 +1,84 @@
+# Estima SK backend — Slovak real-estate data/ML pipeline.
+# Deliberately separate from the CZ stack (`backend_startup`, ports 5432/8000)
+# and the estima-dev stack (55432/8001): its own project name, DB, volumes,
+# and host ports so all three can run side by side.
+name: estima-sk
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-estima_sk}
+      POSTGRES_USER: ${POSTGRES_USER:-estima_sk}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      # Auto-creates the schema on a FRESH database — Postgres runs files in
+      # this dir only when the data volume is empty (e.g. first boot on a new
+      # server). Existing data is never touched.
+      - ./sql/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "${POSTGRES_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-estima_sk} -d ${POSTGRES_DB:-estima_sk}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Read-only HTTP API the estima-sk frontend talks to (GET /listings,
+  # /raw-listings, /health, …). Serves the LIVE schema via src.read_api.
+  # Started by a plain `docker compose up` and published on :8011.
+  read-api:
+    build: .
+    restart: unless-stopped
+    command: uvicorn src.read_api:app --host 0.0.0.0 --port 8000
+    depends_on:
+      db:
+        condition: service_healthy
+    ports:
+      - "${READ_API_PORT:-8011}:8000"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-estima_sk}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-estima_sk}
+      # Optional estima-report-service integration; empty (default) keeps the
+      # internal PDF pipeline. See .env.example.
+      REPORT_SERVICE_URL: ${REPORT_SERVICE_URL:-}
+      REPORT_SERVICE_TIMEOUT_SECONDS: ${REPORT_SERVICE_TIMEOUT_SECONDS:-60}
+      # Photo-quality scoring service (estima-vision / heuristic-cv). Empty
+      # keeps the config.py default; reports degrade gracefully without it.
+      VISION_SERVICE_URL: ${VISION_SERVICE_URL:-}
+    volumes:
+      - .:/app
+
+  # Tools / migration container for the src/ pipeline. Not started by a plain
+  # `docker compose up` (profile-gated); used via `docker compose run --rm ml-api …`
+  # for ingest, migrate, features, training, and tests. The default command
+  # applies SQL migrations, so `docker compose --profile app up ml-api` is a
+  # one-shot migrate-on-deploy. Source is bind-mounted so no rebuild is needed
+  # to pick up code changes.
+  ml-api:
+    build: .
+    profiles: ["app"]
+    restart: "no"
+    command: python -m src.main migrate
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-estima_sk}:${POSTGRES_PASSWORD:-changeme}@db:5432/${POSTGRES_DB:-estima_sk}
+      # Optional estima-report-service integration; empty (default) keeps the
+      # internal PDF pipeline. See .env.example.
+      REPORT_SERVICE_URL: ${REPORT_SERVICE_URL:-}
+      REPORT_SERVICE_TIMEOUT_SECONDS: ${REPORT_SERVICE_TIMEOUT_SECONDS:-60}
+      # Photo-quality scoring service (estima-vision / heuristic-cv). Empty
+      # keeps the config.py default; reports degrade gracefully without it.
+      VISION_SERVICE_URL: ${VISION_SERVICE_URL:-}
+    volumes:
+      - .:/app
+      - artifacts:/app/artifacts
+
+volumes:
+  postgres_data:
+    name: estima_sk_postgres
+  artifacts:
+    name: estima_sk_artifacts
