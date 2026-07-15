@@ -15,15 +15,17 @@ builder both go through here, so a report is fully single-language.
 from __future__ import annotations
 
 DEFAULT_LANG = "en"
-SUPPORTED = ("en", "cs")
+SUPPORTED = ("en", "cs", "sk")
 
 
 def normalize_lang(lang: str | None) -> str:
-    """Map anything user-supplied to a supported code (en/cs), default en."""
+    """Map anything user-supplied to a supported code (en/cs/sk), default en."""
     if not lang:
         return DEFAULT_LANG
     code = lang.strip().lower()[:2]
-    if code in ("cs", "cz", "sk"):   # Czech UI (and Slovak) → Czech report
+    if code == "sk":
+        return "sk"
+    if code in ("cs", "cz"):
         return "cs"
     return "en"
 
@@ -37,6 +39,8 @@ _MONTHS = {
            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"],
     "cs": ["led", "úno", "bře", "dub", "kvě", "čvn",
            "čvc", "srp", "zář", "říj", "lis", "pro"],
+    "sk": ["jan", "feb", "mar", "apr", "máj", "jún",
+           "júl", "aug", "sep", "okt", "nov", "dec"],
 }
 
 
@@ -98,6 +102,24 @@ LABELS = {
         "median_psqm": "Median /m²",
         "asking_vs_est": "Asking vs. estimate",
         "benchmark_title": "External market index",
+        "index_chart_title": "Price index trend",
+        "index_chart_note_external": (
+            "Realized-price market index across periods — a macro trend "
+            "reference for the area, not this property's value over time."
+        ),
+        "index_chart_note_estima": (
+            "Estima INDEX — daily median asking price per m\u00b2 computed from "
+            "listings we monitor. Asking prices, not realized transactions."
+        ),
+        "vc_title": "Photo quality vs comparable listings",
+        "vc_metric": "Metric",
+        "vc_subject": "This listing",
+        "vc_comparables": "Comparables avg ({n})",
+        "vc_note": (
+            "Compares photo measurements only. Weaker numbers mean the listing "
+            "is photographed worse than its comparables — not that the property "
+            "is in worse condition."
+        ),
         "benchmark_note": (
             "Macro benchmark aggregated across the wider market — a realized-price "
             "reference, not a comparable listing for this specific property."
@@ -239,6 +261,24 @@ LABELS = {
         "median_psqm": "Medián /m²",
         "asking_vs_est": "Nabídka vs. odhad",
         "benchmark_title": "Externí tržní index",
+        "index_chart_title": "Vývoj cenového indexu",
+        "index_chart_note_external": (
+            "Tržní index realizovaných cen napříč obdobími — makro reference "
+            "vývoje v lokalitě, nikoli hodnota této nemovitosti v čase."
+        ),
+        "index_chart_note_estima": (
+            "Estima INDEX — denní medián nabídkové ceny za m\u00b2 z inzerátů, "
+            "které sledujeme. Nabídkové ceny, nikoli realizované transakce."
+        ),
+        "vc_title": "Kvalita fotografií vs. srovnatelné inzeráty",
+        "vc_metric": "Metrika",
+        "vc_subject": "Tento inzerát",
+        "vc_comparables": "Průměr srovnatelných ({n})",
+        "vc_note": (
+            "Porovnává pouze měření fotografií. Slabší čísla znamenají, že je "
+            "inzerát hůře nafocen než srovnatelné inzeráty — nikoli že je "
+            "nemovitost v horším stavu."
+        ),
         "benchmark_note": (
             "Makro ukazatel agregovaný za širší trh — reference realizovaných cen, "
             "nikoli srovnatelný inzerát pro tuto konkrétní nemovitost."
@@ -332,6 +372,160 @@ LABELS = {
         "room_balcony": "balkon",
         "room_exterior": "exteriér",
         "room_unknown_word": "neurčeno",
+    },    "sk": {
+        "tagline": "Realitná inteligencia",
+        "report_title": "Odhad hodnoty nehnuteľnosti",
+        "ref": "Č.",
+        "fb_untitled": "Nehnuteľnosť bez názvu",
+        "fb_no_locality": "Lokalita neuvedená",
+        "assessment": "Hodnotenie ceny",
+        "undervalued": "Podhodnotené",
+        "fairly_priced": "Primeraná cena",
+        "overpriced": "Nadhodnotené",
+        "not_assessed": "Neposúdené",
+        "est_market_value": "Odhadovaná trhová hodnota",
+        "vs_asking": "Voči ponukovej cene",
+        "asking_price": "Ponuková cena",
+        "source": "Zdroj",
+        "sale": "Predaj",
+        "rent": "Prenájom",
+        "sec_details": "Údaje o nehnuteľnosti",
+        "sec_market": "Analýza trhu",
+        "sec_vision": "Kvalita fotografií inzerátu",
+        "sec_location": "Lokalita a občianska vybavenosť",
+        "sec_recommendation": "Záverečné odporúčanie",
+        "m_address": "Adresa / Lokalita",
+        "m_type": "Typ nehnuteľnosti",
+        "m_deal": "Typ ponuky",
+        "m_layout": "Dispozícia",
+        "m_floor_area": "Úžitková plocha",
+        "m_land_area": "Plocha pozemku",
+        "m_floor": "Podlažie",
+        "m_asking": "Ponuková cena",
+        "m_psqm": "Cena za m²",
+        "m_source": "Zdroj",
+        "m_first_seen": "Prvýkrát zaznamenané",
+        "m_last_seen": "Naposledy zaznamenané",
+        "m_days": "Dní na trhu",
+        "m_reference": "Odkaz",
+        "listing_link": "Odkaz na inzerát",
+        "est_fair_value": "Odhadovaná primeraná hodnota",
+        "range": "Rozpätie",
+        "local_median": "Miestny medián ceny",
+        "median_psqm": "Medián /m²",
+        "asking_vs_est": "Ponuka vs. odhad",
+        "benchmark_title": "Externý trhový index",
+        "index_chart_title": "Vývoj cenového indexu",
+        "index_chart_note_external": (
+            "Trhový index realizovaných cien naprieč obdobiami — makro referencia "
+            "vývoja v lokalite, nie hodnota tejto nehnuteľnosti v čase."
+        ),
+        "index_chart_note_estima": (
+            "Estima INDEX — denný medián ponukovej ceny za m\u00b2 z inzerátov, "
+            "ktoré sledujeme. Ponukové ceny, nie realizované transakcie."
+        ),
+        "vc_title": "Kvalita fotografií vs. porovnateľné inzeráty",
+        "vc_metric": "Metrika",
+        "vc_subject": "Tento inzerát",
+        "vc_comparables": "Priemer porovnateľných ({n})",
+        "vc_note": (
+            "Porovnáva iba merania fotografií. Slabšie čísla znamenajú, že je "
+            "inzerát horšie nafotený než porovnateľné inzeráty — nie že je "
+            "nehnuteľnosť v horšom stave."
+        ),
+        "benchmark_note": (
+            "Makro ukazovateľ agregovaný za širší trh — referencia realizovaných "
+            "cien, nie porovnateľný inzerát pre túto konkrétnu nehnuteľnosť."
+        ),
+        "benchmark_unit_sale": "EUR/m²",
+        "benchmark_unit_rent": "EUR/m²/mesiac",
+        "comparables": "Porovnateľné inzeráty",
+        "th_property": "Nehnuteľnosť",
+        "th_locality": "Lokalita",
+        "th_layout": "Dispozícia",
+        "th_area": "Plocha",
+        "th_price": "Cena",
+        "th_psqm": "Cena/m²",
+        "th_delta": "Δ voči predmetu",
+        "th_similarity": "Podobnosť",
+        "comp_footnote": (
+            "Δ voči predmetu: záporná hodnota znamená, že porovnateľný inzerát je "
+            "lacnejší než hodnotená nehnuteľnosť. Podobnosť zohľadňuje dispozíciu, "
+            "plochu a blízkosť ceny za m²."
+        ),
+        "fb_no_comparables": (
+            "Pre túto lokalitu a dispozíciu neboli nájdené dostatočne podobné "
+            "inzeráty. Odhad vychádza z trhových mediánov a údajov o nehnuteľnosti."
+        ),
+        "photo_quality": "Kvalita fotografií",
+        "confidence": "Spoľahlivosť",
+        "brightness": "Jas",
+        "sharpness": "Ostrosť",
+        "contrast": "Kontrast",
+        "gallery_photos": "Analyzované fotografie",
+        "observations": "Pozorovania",
+        "room_unknown": "miestnosť: neurčené",
+        "fb_vision_summary": (
+            "Bola zmeraná technická kvalita fotografií z inzerátu. Tieto metriky "
+            "opisujú fotografie, nie stav nehnuteľnosti."
+        ),
+        "fb_condition_notes": (
+            "Uvádzame iba merateľné štatistiky fotografií; snímky neumožňujú "
+            "žiadne tvrdenie o stave nehnuteľnosti."
+        ),
+        "vision_footnote": (
+            "Všetky údaje v tejto sekcii sú merania fotografií z inzerátu (jas, "
+            "ostrosť, expozícia, rozlíšenie). Nevypovedajú nič o rekonštrukcii, "
+            "materiáloch ani skutočnom stave nehnuteľnosti — tie možno posúdiť iba "
+            "osobnou obhliadkou."
+        ),
+        "fb_no_vision": (
+            "Pre túto nehnuteľnosť nie je k dispozícii analýza fotografií. Ocenenie "
+            "vychádza iba z trhových dát, porovnateľných inzerátov a údajov o "
+            "nehnuteľnosti."
+        ),
+        "map_preview": "Náhľad mapy",
+        "map_unavailable": "Náhľad mapy nie je k dispozícii",
+        "poi_transport": "MHD",
+        "poi_grocery": "Obchody s potravinami",
+        "poi_schools": "Školy",
+        "poi_parks": "Parky",
+        "poi_restaurants": "Reštaurácie",
+        "poi_healthcare": "Lekári / lekárne",
+        "within_500m": "do 500 m",
+        "within_1km": "do 1 km",
+        "nearest_facilities": "Najbližšie v okolí",
+        "min_walk": "min chôdze",
+        "location_score": "Skóre lokality",
+        "fb_no_location": "Informácie o lokalite nie sú k dispozícii",
+        "fb_no_location_coords": ", pretože pre túto nehnuteľnosť neboli uvedené súradnice",
+        "fb_no_location_tail": ". Počty neďalekej vybavenosti nebolo možné vypočítať.",
+        "strengths": "Silné stránky",
+        "risks": "Riziká",
+        "next_steps": "Odporúčané ďalšie kroky",
+        "none_identified": "Neboli identifikované.",
+        "fb_rec_summary": (
+            "Z dostupných dát nebolo možné vytvoriť úplné odporúčanie. Kontext "
+            "nájdete v sekciách trhu a porovnateľných inzerátov vyššie."
+        ),
+        "disclaimer": (
+            "Tento report je odhad založený na dátach z trhu, porovnateľných "
+            "inzerátoch, údajoch o nehnuteľnosti a vizuálnych ukazovateľoch. Nejde "
+            "o znalecký posudok a nepredstavuje garantovanú hodnotu."
+        ),
+        "cond_poor": "zlom",
+        "cond_average": "priemernom",
+        "cond_good": "dobrom",
+        "cond_renovated": "zrekonštruovanom",
+        "cond_luxury": "luxusnom",
+        "cond_unclear": "nejasnom",
+        "room_kitchen": "kuchyňa",
+        "room_bathroom": "kúpeľňa",
+        "room_living room": "obývacia izba",
+        "room_bedroom": "spálňa",
+        "room_balcony": "balkón",
+        "room_exterior": "exteriér",
+        "room_unknown_word": "neurčené",
     },
 }
 
@@ -343,6 +537,8 @@ CONDITION_CHIP = {
            "renovated": "renovated", "luxury": "luxury"},
     "cs": {"poor": "špatný", "average": "průměrný", "good": "dobrý",
            "renovated": "zrekonstruovaný", "luxury": "luxusní"},
+    "sk": {"poor": "zlý", "average": "priemerný", "good": "dobrý",
+           "renovated": "zrekonštruovaný", "luxury": "luxusný"},
 }
 
 
@@ -458,6 +654,59 @@ PROSE = {
         "rec_summary": "Celkově se tato {ptype} v lokalitě {loc} jeví jako {priced}{cond}. Před konečným rozhodnutím by měla být posouzena spolu s osobní prohlídkou a aktuálními srovnatelnými inzeráty, neboť tento report je odhad založený na datech, nikoli znalecký posudek.",
         "the_area": "vybrané lokalitě",
         "generic_property": "nemovitost",
+    },    "sk": {
+        "comp_subject": "Hodnotená nehnuteľnosť",
+        "comp_median": "Mediánový porovnateľný",
+        "comp_best": "Najlepší porovnateľný {i}",
+
+        "expl_below": "Táto nehnuteľnosť je približne o {pct:.1f} % pod naším odhadom primeranej hodnoty pre danú lokalitu.",
+        "expl_above": "Táto nehnuteľnosť je približne o {pct:.1f} % nad naším odhadom primeranej hodnoty pre danú lokalitu.",
+        "expl_inline": "Cena tejto nehnuteľnosti zhruba zodpovedá nášmu odhadu primeranej hodnoty pre danú lokalitu.",
+        "expl_pps_below": "Cena za m² je zhruba o {rel:.0f} % pod miestnym mediánom, teda pod porovnateľnými nehnuteľnosťami v rovnakej lokalite.",
+        "expl_pps_above": "Cena za m² je zhruba o {rel:.0f} % nad miestnym mediánom, teda nad porovnateľnými nehnuteľnosťami v rovnakej lokalite.",
+        "expl_pps_close": "Cena za m² sa blíži miestnemu mediánu porovnateľných nehnuteľností.",
+        "expl_widened": "Porovnateľných inzerátov v bezprostrednom okolí bolo málo, preto bol porovnávací základ rozšírený na celé mesto.",
+        "expl_none": "Porovnanie s trhom nebolo možné vypočítať — v tejto lokalite nebol dostatok porovnateľných aktívnych inzerátov na stanovenie porovnávacej ceny.",
+
+        "vision_summary": "Automatická analýza zmerala technickú kvalitu {n} fotografií z inzerátu — jas, ostrosť, expozíciu a rozlíšenie. Tieto metriky opisujú samotné fotografie; nie sú hodnotením stavu nehnuteľnosti, rekonštrukcie ani materiálov.",
+        "vision_summary_no_count": "Automatická analýza zmerala technickú kvalitu fotografií z inzerátu — jas, ostrosť, expozíciu a rozlíšenie. Tieto metriky opisujú samotné fotografie; nie sú hodnotením stavu nehnuteľnosti, rekonštrukcie ani materiálov.",
+        "obs_bright_well_exposed": "Galéria je svetlá a celkovo dobre exponovaná.",
+        "obs_dim": "Galéria je skôr tmavá, čo obmedzuje, čo fotografie môžu ukázať.",
+        "obs_uneven_exposure": "Niekoľko snímok sa javí ako nerovnomerne exponované.",
+        "obs_some_blurry": "Niekoľko snímok sa javí ako rozmazané.",
+        "obs_mostly_blurry": "Väčšina snímok sa javí ako rozmazaná.",
+        "obs_resolution_ok": "Rozlíšenie fotografií je pre prezentáciu dostatočné.",
+        "obs_resolution_low": "Rozlíšenie fotografií je nízke.",
+        "obs_limited_coverage": "Galéria má obmedzené vizuálne pokrytie.",
+
+        "location_pending": "Pre túto nehnuteľnosť sú k dispozícii súradnice, ale počty neďalekej vybavenosti zatiaľ neboli vypočítané. Mapa je zobrazená pre orientáciu.",
+        "location_ok": "Počty vybavenosti vychádzajú z dát OpenStreetMap v okolí súradníc nehnuteľnosti. Skóre lokality zhŕňa pešiu dostupnosť dopravy, obchodov, škôl, parkov, reštaurácií a zdravotnej starostlivosti — ide o ukazovateľ komfortu, nie o vstup do ocenenia.",
+
+        "verdict_undervalued": "Záver: potenciálne zaujímavé — cena pod odhadom primeranej hodnoty.",
+        "verdict_overpriced": "Záver: cena nad miestnym porovnávacím základom — vyjednávajte alebo ďalej porovnávajte.",
+        "verdict_fair": "Záver: primeraná cena pre danú lokalitu.",
+        "verdict_none": "Záver: nedostatok trhových dát pre jednoznačný cenový názor.",
+
+        "str_below": "Ponuková cena ~{pct:.1f} % pod odhadom primeranej hodnoty.",
+        "str_inline": "Cena zhruba zodpovedá miestnemu porovnávaciemu základu.",
+        "str_recent": "Nedávno inzerované — pravdepodobne priláka konkurenčný záujem.",
+        "risk_above": "Ponuková cena ~{pct:.1f} % nad odhadom primeranej hodnoty.",
+        "risk_photo_only": "Analýza fotografií meria iba kvalitu snímok — o skutočnom stave nehnuteľnosti nič nehovorí; obhliadnite osobne.",
+        "risk_poor_photos": "Fotografie v inzeráte majú nízku kvalitu (rozmazané alebo tmavé), čo obmedzuje posúdenie na diaľku.",
+        "risk_no_vision": "Analýza fotografií nie je k dispozícii — pred rozhodnutím si nehnuteľnosť obhliadnite.",
+        "risk_days": "{days} dní na trhu — overte, prečo sa doteraz nepredala.",
+
+        "step_viewing": "Dohodnite si osobnú obhliadku a posúďte skutočný stav nehnuteľnosti.",
+        "step_building": "Vyžiadajte si informácie o vlastníctve domu a fonde opráv.",
+        "step_benchmark": "Pred podaním ponuky porovnajte s aktuálnymi porovnateľnými inzerátmi.",
+
+        "priced_undervalued": "atraktívne ocenená, pod naším odhadom primeranej hodnoty",
+        "priced_fair": "primerane ocenená voči miestnemu porovnávaciemu základu",
+        "priced_overpriced": "ocenená nad miestnym porovnávacím základom",
+        "priced_none": "ťažko presne oceniteľná vzhľadom na obmedzené porovnateľné dáta",
+        "rec_summary": "Celkovo sa táto {ptype} v lokalite {loc} javí ako {priced}{cond}. Pred konečným rozhodnutím by mala byť posúdená spolu s osobnou obhliadkou a aktuálnymi porovnateľnými inzerátmi, keďže tento report je odhad založený na dátach, nie znalecký posudok.",
+        "the_area": "vybranej lokalite",
+        "generic_property": "nehnuteľnosť",
     },
 }
 
@@ -468,6 +717,8 @@ CATEGORY_WORDS = {
            "commercial": "Commercial", "office": "Office"},
     "cs": {"apartment": "Byt", "house": "Dům", "land": "Pozemek",
            "commercial": "Komerční prostor", "office": "Kancelář"},
+    "sk": {"apartment": "Byt", "house": "Dom", "land": "Pozemok",
+           "commercial": "Komerčný priestor", "office": "Kancelária"},
 }
 # Lower-case form for mid-sentence use in the recommendation summary.
 CATEGORY_WORDS_LOWER = {
@@ -475,6 +726,8 @@ CATEGORY_WORDS_LOWER = {
            "commercial": "commercial unit", "office": "office"},
     "cs": {"apartment": "byt", "house": "dům", "land": "pozemek",
            "commercial": "komerční prostor", "office": "kancelář"},
+    "sk": {"apartment": "byt", "house": "dom", "land": "pozemok",
+           "commercial": "komerčný priestor", "office": "kancelária"},
 }
 
 

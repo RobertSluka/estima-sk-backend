@@ -98,6 +98,87 @@ def embed_image(url: Optional[str]) -> str:
 _DASH = "—"
 
 
+def _index_svg(series) -> "Markup":
+    """Render an IndexSeries as a small self-contained SVG line chart.
+
+    WeasyPrint ignores CSS inside inline SVG, so every style is an attribute.
+    Returns empty markup when there is nothing worth charting.
+    """
+    from markupsafe import Markup, escape
+
+    points = getattr(series, "points", None) or []
+    if len(points) < 3:
+        return Markup("")
+
+    W, H = 640, 150
+    PAD_L, PAD_R, PAD_T, PAD_B = 8, 8, 16, 22
+    BRAND, GRID, MUTED = "#123a5e", "#dbe4ec", "#6b7f90"
+
+    vals = [p.value for p in points]
+    lo, hi = min(vals), max(vals)
+    span = (hi - lo) or max(abs(hi), 1.0)
+    lo -= span * 0.10
+    hi += span * 0.10
+    span = hi - lo
+
+    def x(i: int) -> float:
+        return PAD_L + i * (W - PAD_L - PAD_R) / (len(points) - 1)
+
+    def y(v: float) -> float:
+        return PAD_T + (hi - v) * (H - PAD_T - PAD_B) / span
+
+    def fmt(v: float) -> str:
+        return f"{v:,.0f}".replace(",", "\u202f")
+
+    poly = " ".join(f"{x(i):.1f},{y(p.value):.1f}" for i, p in enumerate(points))
+    area = f"{PAD_L},{H - PAD_B} {poly} {W - PAD_R},{H - PAD_B}"
+
+    parts = [
+        f'<svg width="{W}" height="{H}" viewBox="0 0 {W} {H}" '
+        f'xmlns="http://www.w3.org/2000/svg">'
+    ]
+    # horizontal gridlines
+    for frac in (0.0, 0.5, 1.0):
+        gy = PAD_T + frac * (H - PAD_T - PAD_B)
+        parts.append(
+            f'<line x1="{PAD_L}" y1="{gy:.1f}" x2="{W - PAD_R}" y2="{gy:.1f}" '
+            f'stroke="{GRID}" stroke-width="1"/>'
+        )
+    parts.append(f'<polygon points="{area}" fill="{BRAND}" fill-opacity="0.07"/>')
+    parts.append(
+        f'<polyline points="{poly}" fill="none" stroke="{BRAND}" '
+        f'stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>'
+    )
+    for i, p in enumerate(points):
+        r = 3.4 if i == len(points) - 1 else 2.2
+        parts.append(
+            f'<circle cx="{x(i):.1f}" cy="{y(p.value):.1f}" r="{r}" fill="{BRAND}"/>'
+        )
+    # first/last value labels above their points
+    first, last = points[0], points[-1]
+    parts.append(
+        f'<text x="{x(0):.1f}" y="{y(first.value) - 6:.1f}" text-anchor="start" '
+        f'font-family="Helvetica, Arial, sans-serif" font-size="9" fill="{MUTED}">'
+        f"{fmt(first.value)}</text>"
+    )
+    parts.append(
+        f'<text x="{x(len(points) - 1):.1f}" y="{y(last.value) - 6:.1f}" text-anchor="end" '
+        f'font-family="Helvetica, Arial, sans-serif" font-size="9" font-weight="bold" '
+        f'fill="{BRAND}">{fmt(last.value)}</text>'
+    )
+    # x labels: first, middle, last
+    for i in (0, len(points) // 2, len(points) - 1):
+        anchor = "start" if i == 0 else ("end" if i == len(points) - 1 else "middle")
+        parts.append(
+            f'<text x="{x(i):.1f}" y="{H - 7}" text-anchor="{anchor}" '
+            f'font-family="Helvetica, Arial, sans-serif" font-size="8.5" fill="{MUTED}">'
+            f"{escape(points[i].label)}</text>"
+        )
+    parts.append("</svg>")
+    return Markup("".join(parts))
+
+
+
 def _fmt_money(value, currency: str = "CZK") -> str:
     if value is None:
         return _DASH
@@ -202,6 +283,7 @@ def _env() -> Environment:
     env.filters["embed_image"] = embed_image
     env.filters["dist"] = _fmt_distance
     env.filters["walk_min"] = _walk_minutes
+    env.filters["index_svg"] = _index_svg
     return env
 
 

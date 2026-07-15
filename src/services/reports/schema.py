@@ -115,9 +115,33 @@ class MarketBenchmark(BaseModel):
     scope: Optional[str] = None                  # "Praha 4" or the city fallback
 
 
+class IndexPoint(BaseModel):
+    """One point of the price-index trend chart."""
+
+    label: str                                   # display form, e.g. "Q1 2026" or "12 Jun"
+    value: float                                 # price per m² in report currency
+
+
+class IndexSeries(BaseModel):
+    """Price-index trend for the subject's scope, rendered as a chart.
+
+    `kind` says what the numbers are: "external" = the realized-price market
+    index across periods (Deloitte/NBS); "estima" = the Estima INDEX, daily
+    median *asking* prices computed from our own snapshots — used when the
+    external index has too few periods to chart.
+    """
+
+    kind: str = "external"                       # "external" | "estima"
+    name: Optional[str] = None                   # e.g. "Deloitte Real Index"
+    unit: Optional[str] = None                   # "CZK/m²" or "EUR/m²"
+    scope: Optional[str] = None                  # district/city the series covers
+    points: List[IndexPoint] = Field(default_factory=list)
+
+
 class Comparable(BaseModel):
     """One comparable listing (or the synthesised 'median comparable')."""
 
+    property_id: Optional[str] = None            # DB id; not rendered
     label: Optional[str] = None                  # e.g. "Best comparable 1"
     locality: Optional[str] = None
     layout: Optional[str] = None
@@ -129,6 +153,22 @@ class Comparable(BaseModel):
     source_url: Optional[str] = None
     is_subject: bool = False
     is_median: bool = False
+
+
+class VisionComparison(BaseModel):
+    """Subject's photo-quality metrics vs the average of its comparables.
+
+    Technical photo measurements only (same contract as VisionAnalysis) —
+    a listing whose photos measure worse than its comparables' may simply be
+    badly photographed, never "in worse condition"."""
+
+    subject_quality: Optional[float] = None      # 0–100
+    comparables_quality: Optional[float] = None  # 0–100, average
+    subject_brightness: Optional[float] = None
+    comparables_brightness: Optional[float] = None
+    subject_sharpness: Optional[float] = None
+    comparables_sharpness: Optional[float] = None
+    comparable_count: int = 0                    # comparables with scored photos
 
 
 class VisionImage(BaseModel):
@@ -168,6 +208,7 @@ class VisionAnalysis(BaseModel):
     observations: List[str] = Field(default_factory=list)  # localized, measurable
     summary: Optional[str] = None
     images: List[VisionImage] = Field(default_factory=list)
+    comparison: Optional[VisionComparison] = None  # vs comparables' photo metrics
 
     # DEPRECATED — semantic condition claims and vision-driven price
     # adjustments were removed (local analysis cannot support them). Kept
@@ -239,6 +280,7 @@ class ReportData(BaseModel):
     property: Property
     market_analysis: MarketAnalysis = Field(default_factory=MarketAnalysis)
     benchmarks: List[MarketBenchmark] = Field(default_factory=list)
+    index_series: Optional[IndexSeries] = None
     comparables: List[Comparable] = Field(default_factory=list)
     vision_analysis: VisionAnalysis = Field(default_factory=lambda: VisionAnalysis(available=False))
     location_analysis: LocationAnalysis = Field(default_factory=lambda: LocationAnalysis(available=False))

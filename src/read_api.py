@@ -433,7 +433,7 @@ def price_drops(
 )
 def property_report_pdf(
     property_id: int,
-    lang: str = Query("en", description="Report language: 'en' or 'cs' (also accepts 'cz')"),
+    lang: str = Query("en", description="Report language: 'en', 'cs' or 'sk'"),
 ) -> Response:
     """Generate a client-ready valuation PDF for one property.
 

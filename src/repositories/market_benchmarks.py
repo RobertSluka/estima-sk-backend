@@ -89,6 +89,41 @@ def list_benchmarks(
     return cur.fetchall()
 
 
+def series_for_district(
+    cur,
+    *,
+    district: str,
+    metric: str = "realized_price_per_sqm",
+    segment: str = "all",
+    limit: int = 16,
+) -> list[dict]:
+    """Benchmark values across periods for one district (city fallback),
+    oldest first — the data behind the report's index trend chart.
+
+    Same scope rule as `for_district`, applied per period: the district row
+    when one exists, else the city-level row.
+    """
+    cur.execute(
+        """
+        SELECT DISTINCT ON (period)
+               period, year, quarter, source_name, granularity, city, district,
+               value_czk_per_sqm
+        FROM market_benchmarks
+        WHERE metric = %(metric)s AND segment = %(segment)s
+          AND granularity IN ('district', 'city')
+          AND (district = %(district)s OR granularity = 'city')
+          AND value_czk_per_sqm IS NOT NULL
+        ORDER BY period, (district = %(district)s) DESC NULLS LAST
+        """,
+        {"metric": metric, "segment": segment, "district": district},
+    )
+    rows = sorted(
+        cur.fetchall(),
+        key=lambda r: (r["year"] or 0, r["quarter"] or 0, r["period"]),
+    )
+    return rows[-limit:]
+
+
 def for_district(
     cur,
     *,

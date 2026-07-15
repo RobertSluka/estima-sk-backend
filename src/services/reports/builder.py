@@ -27,6 +27,8 @@ from src.services.reports import geo, i18n
 from src.services.reports.schema import (
     Comparable,
     DealType,
+    IndexPoint,
+    IndexSeries,
     LocationAnalysis,
     MarketAnalysis,
     MarketBenchmark,
@@ -37,8 +39,9 @@ from src.services.reports.schema import (
     ReportMeta,
     ValuationLabel,
     VisionAnalysis,
+    VisionComparison,
 )
-from src.repositories import location_scores, market_benchmarks, vision_scores
+from src.repositories import location_scores, market_benchmarks, market_index, vision_scores
 
 logger = logging.getLogger(__name__)
 
@@ -93,6 +96,7 @@ def build_report(
         vision_row = _fetch_vision(cur, property_id)
         location_row = _fetch_location(cur, property_id)
         benchmark_row = _fetch_benchmark(cur, row)
+        index_kind, index_rows = _fetch_index_rows(cur, row)
 
     prop = _to_property(row, lang)
     market, comparables = _build_market(row, candidates, widened, lang, picked=picked)
@@ -109,6 +113,7 @@ def build_report(
         vision_row = vision_row_future.result()
 
     vision = _build_vision(vision_row, market, prop, lang)
+    vision.comparison = _build_vision_comparison(vision_row, comparables)
     recommendation = _build_recommendation(prop, market, vision, location, lang)
 
     return ReportData(
@@ -119,6 +124,7 @@ def build_report(
         property=prop,
         market_analysis=market,
         benchmarks=_build_benchmarks(benchmark_row, row, lang),
+        index_series=_build_index_series(index_kind, index_rows, row, lang),
         comparables=comparables,
         vision_analysis=vision,
         location_analysis=location,
@@ -246,25 +252,188 @@ def _fetch_location(cur, property_id: int) -> Optional[dict]:
 
 
 def _fetch_benchmark(cur, row: dict) -> Optional[dict]:
-    """Latest external index row for the subject's region (national fallback).
+    """Latest external index row for the subject's district (city fallback).
 
-    SK: benchmark rows come from the NBS regional price index, which is
-    kraj-level — resolve the subject's okres (properties.district) to its kraj
-    and match the benchmark stored as "<Kraj> kraj". Unresolved districts fall
-    back to the SR national row (granularity 'city'). NBS publishes sale prices
-    only, so rent listings simply find no row and the section degrades.
+    Sale listings anchor against realized sale prices (Deloitte Real Index),
+    rent listings against realized rents (Deloitte Rent Index).
     """
     metric = (
         "realized_rent_per_sqm_month"
         if _deal_type(row) == DealType.RENT
         else "realized_price_per_sqm"
     )
+    return market_benchmarks.for_district(
+        cur, district=_benchmark_series_district(row), metric=metric
+    )
+
+
+# Minimum points before a trend line is worth drawing; fewer reads as noise.
+_MIN_INDEX_POINTS = 3
+# Cap chart density — evenly thinned beyond this.
+_MAX_INDEX_POINTS = 16
+
+
+def _benchmark_series_district(row: dict) -> str:
+    """The market_benchmarks district key for this subject.
+
+    SK: benchmark rows come from the NBS regional index, stored per kraj as
+    "<Kraj> kraj" — resolve the subject's okres (properties.district) to its
+    kraj. Unresolved districts fall back to the SR national 'city' row.
+    NBS publishes sale prices only, so rent lookups find no row and the
+    benchmark/index sections degrade."""
     from src.services import slovak_regions
 
     okres = row.get("district") or ""
     kraj = slovak_regions.kraj_of_okres(okres)
-    district = f"{kraj} kraj" if kraj else okres
-    return market_benchmarks.for_district(cur, district=district, metric=metric)
+    return f"{kraj} kraj" if kraj else okres
+
+
+def _fetch_index_rows(cur, row: dict) -> tuple[Optional[str], list[dict]]:
+    """Raw rows behind the index trend chart: ("external"|"estima"|None, rows).
+
+    Prefers the external realized-price index across periods; when that has
+    too few periods to chart (e.g. a single imported report), falls back to
+    the Estima INDEX — daily median asking prices from our own snapshots.
+    """
+    metric = (
+        "realized_rent_per_sqm_month"
+        if _deal_type(row) == DealType.RENT
+        else "realized_price_per_sqm"
+    )
+    bench_rows = market_benchmarks.series_for_district(
+        cur, district=_benchmark_series_district(row), metric=metric
+    )
+    if len(bench_rows) >= _MIN_INDEX_POINTS:
+        return "external", bench_rows
+
+    deal = "rent" if _deal_type(row) == DealType.RENT else "buy"
+    category = (row.get("category") or "").lower()
+    if category not in market_index.CATEGORY_BUCKETS:
+        category = "apartment"
+    idx_rows = market_index.series(
+        cur, deal_type=deal, category=category, district=row.get("district")
+    )
+    if len(idx_rows) < _MIN_INDEX_POINTS:
+        idx_rows = market_index.series(cur, deal_type=deal, category=category)
+    if len(idx_rows) >= _MIN_INDEX_POINTS:
+        return "estima", idx_rows
+    return None, []
+
+
+def _thin(points: list, cap: int = _MAX_INDEX_POINTS) -> list:
+    """Evenly thin a series to at most `cap` points, keeping first and last."""
+    if len(points) <= cap:
+        return points
+    step = (len(points) - 1) / (cap - 1)
+    return [points[round(i * step)] for i in range(cap)]
+
+
+def _build_index_series(
+    kind: Optional[str], rows: list[dict], row: dict, lang: str
+) -> Optional[IndexSeries]:
+    """Map raw index rows to the chart model (see _fetch_index_rows)."""
+    if not kind or not rows:
+        return None
+    strings = i18n.strings(lang)
+    rent = _deal_type(row) == DealType.RENT
+    unit = strings["benchmark_unit_rent"] if rent else strings["benchmark_unit_sale"]
+
+    if kind == "external":
+        points = []
+        for b in _thin(rows):
+            period = b.get("period") or ""
+            m = re.match(r"^(\d{4})_Q(\d)$", period)
+            label = f"Q{m.group(2)} {m.group(1)}" if m else period
+            points.append(IndexPoint(label=label, value=float(b["value_czk_per_sqm"])))
+        last = rows[-1]
+        scope = (
+            last.get("district")
+            if last.get("granularity") == "district"
+            else last.get("city")
+        )
+        return IndexSeries(
+            kind="external", name=last.get("source_name"), unit=unit,
+            scope=scope, points=points,
+        )
+
+    # Estima INDEX: daily median asking price per m² from our snapshots.
+    usable = [r for r in rows if _f(r.get("median_price_per_sqm"))]
+    if len(usable) < _MIN_INDEX_POINTS:
+        return None
+    points = [
+        IndexPoint(
+            label=f"{d.day} {i18n.month_abbr(lang, d.month)}",
+            value=round(_f(r["median_price_per_sqm"]), 0),
+        )
+        for r in _thin(usable)
+        for d in [r["snapshot_date"]]
+    ]
+    return IndexSeries(
+        kind="estima", name="Estima INDEX", unit=unit,
+        scope=row.get("district") or row.get("city"), points=points,
+    )
+
+
+def _build_vision_comparison(
+    vrow: Optional[dict], comparables: list[Comparable]
+) -> Optional[VisionComparison]:
+    """Subject photo metrics vs the average of its scored comparables.
+
+    Purely technical photo measurements (same _to_100 normalisation and
+    mock-row guard as _build_vision) — omitted entirely unless the subject
+    and at least one comparable both carry real scores.
+    """
+    if not vrow or vrow.get("model_provider") == "mock":
+        return None
+    subj_quality = _to_100(vrow.get("image_quality"))
+    if subj_quality is None:
+        subj_quality = _to_100(vrow.get("photo_quality"))
+    if subj_quality is None:
+        return None
+
+    ids = [
+        int(c.property_id)
+        for c in comparables
+        if c.property_id and not c.is_subject and not c.is_median
+    ]
+    if not ids:
+        return None
+    with get_cursor(commit=False) as cur:
+        cur.execute(
+            """
+            SELECT image_quality, photo_quality, brightness, sharpness
+            FROM vision_scores
+            WHERE property_id = ANY(%s)
+              AND COALESCE(model_provider, '') <> 'mock'
+            """,
+            (ids,),
+        )
+        rows = cur.fetchall()
+
+    def _avg(values: list) -> Optional[float]:
+        vals = [v for v in values if v is not None]
+        return round(sum(vals) / len(vals), 0) if vals else None
+
+    comp_quality = _avg([
+        _to_100(r.get("image_quality")) if r.get("image_quality") is not None
+        else _to_100(r.get("photo_quality"))
+        for r in rows
+    ])
+    if comp_quality is None:
+        return None
+    scored = sum(
+        1 for r in rows
+        if r.get("image_quality") is not None or r.get("photo_quality") is not None
+    )
+    return VisionComparison(
+        subject_quality=subj_quality,
+        comparables_quality=comp_quality,
+        subject_brightness=_to_100(vrow.get("brightness")),
+        comparables_brightness=_avg([_to_100(r.get("brightness")) for r in rows]),
+        subject_sharpness=_to_100(vrow.get("sharpness")),
+        comparables_sharpness=_avg([_to_100(r.get("sharpness")) for r in rows]),
+        comparable_count=scored,
+    )
 
 
 # --------------------------------------------------------------------------- #
@@ -462,6 +631,7 @@ def _build_market(
     for i, c in enumerate(best, start=1):
         cp = _f(c.get("current_price"))
         comparables.append(Comparable(
+            property_id=str(c["id"]),
             label=P["comp_best"].format(i=i), locality=c.get("locality"), layout=c.get("layout"),
             floor_area=_f(c.get("floor_area")), price=cp,
             price_per_sqm=_f(c.get("current_price_per_sqm")),
