@@ -210,12 +210,16 @@ def _vision_block(report: ReportData) -> dict:
 
     # Photo-quality signals only — condition/renovation fields are deliberately
     # not forwarded (report wording: estimates, never condition claims).
+    # `images` feeds the template's gallery; vision rows carry no URLs of
+    # their own, so the listing photos (= the analysed gallery) are the source.
     return {
         "available": True,
         "summary": vision.summary,
         "photo_quality": vision.visual_quality_score,
         "brightness": _avg("brightness"),
         "sharpness": _avg("sharpness"),
+        "gallery_size": vision.gallery_size,
+        "images": report.property.image_urls[:3],
     }
 
 

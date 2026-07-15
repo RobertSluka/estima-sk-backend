@@ -238,6 +238,19 @@
   .bar { height: 5pt; background: var(--line); border-radius: 3px; margin-top: 6pt; overflow: hidden; }
   .bar > span { display: block; height: 100%; background: var(--brand-2); }
 
+  /* Photo strip in the photo-quality section. inline-block, not flex —
+     WeasyPrint's flex gap handling is unreliable. */
+  .photo-strip { margin: 8pt 0 2pt; font-size: 0; }
+  .photo-strip img {
+    display: inline-block;
+    width: 32.3%;
+    height: 100pt;
+    object-fit: cover;
+    border-radius: 6px;
+    margin-right: 1.5%;
+  }
+  .photo-strip img:last-child { margin-right: 0; }
+
   .cond-chip {
     display: inline-block;
     font-size: 8pt;
@@ -512,6 +525,13 @@
     <div class="score-badge"><div class="n">{{ r.vision_analysis.sharpness_score | num(0) }}<small>/100</small></div><div class="l">{{ T.sharpness }}</div></div>
     <div class="score-badge"><div class="n">{{ r.vision_analysis.gallery_size | num(0) }}</div><div class="l">{{ T.gallery_photos }}</div></div>
   </div>
+
+  {# The analysed photos themselves — the metrics above are about these. #}
+  {% if r.property.image_urls %}
+  <div class="photo-strip">
+    {% for img in r.property.image_urls[:3] %}<img src="{{ img | embed_image }}" alt="">{% endfor %}
+  </div>
+  {% endif %}
 
   <div class="callout">
     {{ r.vision_analysis.summary | dash(T.fb_vision_summary) }}
