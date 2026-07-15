@@ -43,7 +43,7 @@ _PENDING_SQL = """
 def _select_pending(cur, *, limit: int, rescore: bool) -> list[dict]:
     missing_clause = (
         "" if rescore
-        else "AND NOT EXISTS (SELECT 1 FROM location_scores l WHERE l.property_id = id)"
+        else "AND NOT EXISTS (SELECT 1 FROM location_scores l WHERE l.property_id = properties.id)"
     )
     cur.execute(_PENDING_SQL.format(missing_clause=missing_clause), {"limit": limit})
     return cur.fetchall()
