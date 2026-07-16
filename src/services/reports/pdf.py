@@ -110,8 +110,8 @@ def _index_svg(series) -> "Markup":
     if len(points) < 3:
         return Markup("")
 
-    W, H = 640, 150
-    PAD_L, PAD_R, PAD_T, PAD_B = 8, 8, 16, 22
+    W, H = 640, 104
+    PAD_L, PAD_R, PAD_T, PAD_B = 8, 8, 14, 20
     BRAND, GRID, MUTED = "#123a5e", "#dbe4ec", "#6b7f90"
 
     vals = [p.value for p in points]

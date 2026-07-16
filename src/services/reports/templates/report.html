@@ -184,7 +184,7 @@
     background: var(--panel);
     border: 1px solid var(--line);
     border-radius: 8px;
-    padding: 11pt 13pt;
+    padding: 9pt 13pt;
   }
   .card .label { font-size: 7.5pt; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); }
   .card .big { font-size: 15pt; font-weight: 700; margin-top: 3pt; }
@@ -194,8 +194,8 @@
     background: var(--info-bg);
     border-left: 3px solid var(--brand-2);
     border-radius: 4px;
-    padding: 9pt 12pt;
-    margin-top: 12pt;
+    padding: 7pt 12pt;
+    margin-top: 8pt;
     font-size: 9.5pt;
     color: var(--ink);
   }
@@ -212,7 +212,7 @@
     font-weight: 600;
     font-size: 8pt;
   }
-  .data-table td { padding: 6pt 7pt; border-bottom: 1px solid var(--line); }
+  .data-table td { padding: 4pt 7pt; border-bottom: 1px solid var(--line); }
   .data-table tr.subject-row td { background: var(--warn-bg); font-weight: 700; }
   .data-table tr.median-row td { background: var(--panel); font-style: italic; }
   .data-table .num { text-align: right; white-space: nowrap; }
@@ -462,7 +462,7 @@
   {% endif %}
 
   {% if r.index_series and r.index_series.points | length >= 3 %}
-  <div class="avoid-break" style="margin-top:10pt; border:1px solid var(--line); border-radius:6pt; padding:8pt 10pt">
+  <div class="avoid-break" style="margin-top:6pt; border:1px solid var(--line); border-radius:6pt; padding:6pt 10pt">
     <div style="font-size:9pt; font-weight:600; color:var(--brand)">
       {{ T.index_chart_title }}
       <span class="muted" style="font-weight:400">
@@ -476,9 +476,12 @@
   </div>
   {% endif %}
 
-  <h3 style="font-size:10pt; color:var(--brand); margin-top:16pt; margin-bottom:4pt">{{ T.comparables }}</h3>
+  <h3 style="font-size:10pt; color:var(--brand); margin-top:10pt; margin-bottom:4pt">{{ T.comparables }}</h3>
   {% if r.comparables %}
-  <table class="data-table avoid-break">
+  {# No avoid-break here: WeasyPrint would shove the whole table onto a
+     near-empty next page even with plenty of room under the chart. Letting it
+     flow keeps the comparables tucked into Market Analysis (matches CZ). #}
+  <table class="data-table">
     <thead>
       <tr>
         <th>{{ T.th_property }}</th><th>{{ T.th_locality }}</th><th>{{ T.th_layout }}</th>
@@ -503,7 +506,7 @@
       {% endfor %}
     </tbody>
   </table>
-  <p class="muted" style="font-size:7.5pt; margin-top:5pt">{{ T.comp_footnote }}</p>
+  <p class="muted" style="font-size:7.5pt; margin-top:3pt">{{ T.comp_footnote }}</p>
   {% else %}
   <div class="fallback">{{ T.fb_no_comparables }}</div>
   {% endif %}

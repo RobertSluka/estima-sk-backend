@@ -46,7 +46,10 @@ from src.repositories import location_scores, market_benchmarks, market_index, v
 logger = logging.getLogger(__name__)
 
 # How wide to cast the comparable net and how many "best" comps to show.
-_MAX_COMPARABLES = 3
+# 2 (not 3) keeps the comparables table tucked under the Market Analysis
+# section on one page, matching the CZ report's compact layout instead of
+# spilling onto a near-empty extra page.
+_MAX_COMPARABLES = 2
 _CANDIDATE_LIMIT = 200
 # Explicit user selections may exceed the auto cap, but keep the PDF bounded.
 _MAX_PICKED_COMPARABLES = 20
