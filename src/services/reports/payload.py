@@ -93,7 +93,9 @@ def assemble(report: ReportData, row: dict, distribution: dict | None) -> dict:
             "model_version": "estima-sk-comparables",
             "data_freshness_note": "Comparables read from the live listing database at generation time.",
         },
-        "options": {"template": "default", "language": "en"},
+        # "estima" is the shared production design in estima-report-service;
+        # pass the requested language through so sk payloads get sk templates.
+        "options": {"template": "estima", "language": lang},
     }
     return payload
 
