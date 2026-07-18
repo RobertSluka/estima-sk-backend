@@ -88,6 +88,8 @@ def _listing_from_row(row: dict) -> dict:
     price = row["current_price"]
     area = float(row["floor_area"]) if row["floor_area"] is not None else None
     pps = row["current_price_per_sqm"]
+    # Prefer the street-level geocoded position over the town centroid.
+    precise = row.get("geo_lat") is not None and row.get("geo_lon") is not None
     return {
         "id": str(row["id"]),
         "source": row["source"],
@@ -103,8 +105,10 @@ def _listing_from_row(row: dict) -> dict:
         "landArea": float(row["land_area"]) if row["land_area"] is not None else None,
         "price": int(price) if price is not None else None,
         "pricePerSqm": float(pps) if pps is not None else None,
-        "lat": row["lat"],
-        "lon": row["lon"],
+        "lat": row["geo_lat"] if precise else row["lat"],
+        "lon": row["geo_lon"] if precise else row["lon"],
+        "street": row.get("street"),
+        "geoPrecision": "street" if precise else "town",
         "imageUrl": row["image_url"],
         "images": row.get("images") or [],
         "url": row["url"],
@@ -181,7 +185,8 @@ def listings(
         cur.execute(
             f"""
             SELECT id, source, source_listing_id, url, deal_type, category, name, locality,
-                   district, layout, floor_area, land_area, lat, lon, image_url, images,
+                   district, layout, floor_area, land_area, lat, lon,
+                   street, geo_lat, geo_lon, geo_precision, image_url, images,
                    first_seen_at, last_seen_at, current_price,
                    current_price_per_sqm, active
             FROM properties

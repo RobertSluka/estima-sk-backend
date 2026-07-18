@@ -85,6 +85,22 @@ def mark_inactive_cmd(days: int):
     click.echo(f"Marked {count} properties as inactive.")
 
 
+@cli.command("geocode-streets")
+@click.option("--limit", default=500, show_default=True,
+              help="Maximum properties to process in this run.")
+@click.option("--retry-missing", is_flag=True, default=False,
+              help="Also retry properties whose previous attempt found no street position.")
+def geocode_streets_cmd(limit: int, retry_missing: bool):
+    """Extract street names from listing text and geocode them (Nominatim, cached)."""
+    from src.services.street_geocoding import run
+
+    stats = run(limit=limit, retry_missing=retry_missing)
+    click.echo(
+        f"Processed {stats.processed}: {stats.with_street} had a street mention, "
+        f"{stats.geocoded} geocoded to street level."
+    )
+
+
 @cli.command("generate-market-stats")
 @click.option("--date", "stat_date", default=None,
               help="Date to compute stats for (YYYY-MM-DD). Defaults to today.")

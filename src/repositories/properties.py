@@ -108,6 +108,49 @@ def upsert(cur, normalized: dict, scraped_at: datetime) -> tuple[int, int | None
     return property_id, old_price, is_new
 
 
+def list_geocode_pending(cur, limit: int = 500) -> list[dict]:
+    """Properties never attempted by street geocoding, with their latest raw text."""
+    cur.execute(
+        """
+        SELECT p.id, p.name, p.city, p.locality, p.lat, p.lon,
+               r.raw_json->>'content' AS content
+        FROM properties p
+        LEFT JOIN LATERAL (
+            SELECT raw_json
+            FROM raw_listings r
+            WHERE r.source = p.source AND r.source_listing_id = p.source_listing_id
+            ORDER BY r.scraped_at DESC NULLS LAST, r.id DESC
+            LIMIT 1
+        ) r ON TRUE
+        WHERE p.geocoded_at IS NULL
+        ORDER BY p.id
+        LIMIT %s
+        """,
+        (limit,),
+    )
+    return list(cur.fetchall())
+
+
+def set_geocode_result(
+    cur,
+    property_id: int,
+    street: str | None,
+    geo_lat: float | None,
+    geo_lon: float | None,
+    geo_precision: str | None,
+) -> None:
+    """Record a geocoding attempt (also when nothing was found — see geocoded_at)."""
+    cur.execute(
+        """
+        UPDATE properties
+        SET street = %s, geo_lat = %s, geo_lon = %s, geo_precision = %s,
+            geocoded_at = NOW(), updated_at = NOW()
+        WHERE id = %s
+        """,
+        (street, geo_lat, geo_lon, geo_precision, property_id),
+    )
+
+
 def mark_inactive(cur, days_since_last_seen: int = 3) -> int:
     """Mark properties not seen within N days as inactive. Returns rows updated."""
     cur.execute(

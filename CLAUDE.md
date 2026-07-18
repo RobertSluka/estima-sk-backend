@@ -54,7 +54,11 @@ aggregates.
 - `src/services/` — orchestration: `normalizer.py` (raw item → canonical dict),
   `ingestion.py`, `market_statistics.py`, `feature_generation.py`
   (leakage-free), `training.py`, `model_registry.py`, `prediction.py`,
-  `vision_scoring.py`, `reports/`
+  `vision_scoring.py`, `reports/`; `street_extraction.py` + `geocoding.py` +
+  `street_geocoding.py` (parse street names from Bazoš free text, geocode via
+  Nominatim — once-ever disk cache in `data/geocode`, ≤1 req/s; run
+  `python -m src.main geocode-streets` after ingest; read API then prefers
+  `geo_lat/geo_lon` over town centroids)
 - `sql/init.sql` — full schema for a fresh DB (auto-applied on first volume boot);
   `sql/migrations/*.sql` — ordered, idempotent upgrades tracked in
   `schema_migrations`

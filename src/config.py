@@ -91,3 +91,14 @@ REPORT_SERVICE_TIMEOUT_SECONDS: int = int(os.environ.get("REPORT_SERVICE_TIMEOUT
 # estima-sk Next.js server (never by browsers). Empty (default) disables those
 # endpoints entirely — fail closed, mirroring the frontend's ADMIN_PASSWORD rule.
 INTERNAL_API_KEY: str = os.environ.get("INTERNAL_API_KEY", "")
+
+# Nominatim geocoding of extracted street names (src/services/geocoding.py).
+# Nominatim's usage policy demands ≤1 req/s, a descriptive User-Agent and
+# caching — every unique (street, town) query is answered from the on-disk
+# cache after its first ever lookup, mirroring the Overpass POI cache.
+NOMINATIM_URL: str = os.environ.get("NOMINATIM_URL", "https://nominatim.openstreetmap.org/search")
+NOMINATIM_TIMEOUT_SECONDS: int = int(os.environ.get("NOMINATIM_TIMEOUT_SECONDS", "10"))
+NOMINATIM_MIN_INTERVAL_SECONDS: float = float(
+    os.environ.get("NOMINATIM_MIN_INTERVAL_SECONDS", "1.1")
+)
+GEOCODE_CACHE_DIR: str = os.environ.get("GEOCODE_CACHE_DIR", "data/geocode")
