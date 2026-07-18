@@ -41,10 +41,12 @@ def build_payload(property_id: int, lang: str = "en") -> dict:
             category=row.get("category"),
         )
 
-    return assemble(report, row, distribution)
+    return assemble(report, row, distribution, lang=lang)
 
 
-def assemble(report: ReportData, row: dict, distribution: dict | None) -> dict:
+def assemble(
+    report: ReportData, row: dict, distribution: dict | None, lang: str = "en"
+) -> dict:
     """Pure mapping of ``ReportData`` + property row (+ optional distribution)
     to the report-service payload dict. Split from ``build_payload`` so it can
     be tested without a database."""
