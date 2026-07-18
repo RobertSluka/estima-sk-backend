@@ -86,3 +86,8 @@ VISION_EMPTY_RETRY_DAYS: int = int(os.environ.get("VISION_EMPTY_RETRY_DAYS", "7"
 # so existing deployments are unaffected.
 REPORT_SERVICE_URL: str = os.environ.get("REPORT_SERVICE_URL", "")
 REPORT_SERVICE_TIMEOUT_SECONDS: int = int(os.environ.get("REPORT_SERVICE_TIMEOUT_SECONDS", "60"))
+
+# Shared secret for the /internal/* account & billing endpoints consumed by the
+# estima-sk Next.js server (never by browsers). Empty (default) disables those
+# endpoints entirely — fail closed, mirroring the frontend's ADMIN_PASSWORD rule.
+INTERNAL_API_KEY: str = os.environ.get("INTERNAL_API_KEY", "")

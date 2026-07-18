@@ -23,19 +23,22 @@ Endpoints:
 """
 
 import csv
+import hmac
 import io
 import logging
 import re
+from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import FastAPI, HTTPException, Query, Response
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from src import config
 from src.db import get_cursor
 from src.repositories import market_benchmarks, market_index, market_statistics, price_changes
-from src.services import slovak_regions
+from src.repositories import users as users_repo
+from src.services import accounts, slovak_regions
 
 logger = logging.getLogger(__name__)
 
@@ -662,3 +665,128 @@ def raw_listings(
         for r in rows
     ]
     return {"total": total, "limit": limit, "offset": offset, "items": items}
+
+
+# ---------------------------------------------------------------------------
+# Internal account & billing API (consumed by the estima-sk Next.js server).
+#
+# Guarded by the INTERNAL_API_KEY shared secret — these endpoints are never
+# called from browsers, only server-to-server. With no key configured they
+# return 503 (fail closed) so a misconfigured deploy can't expose accounts.
+# ---------------------------------------------------------------------------
+
+
+def _require_internal_key(x_internal_key: str = Header(default="")) -> None:
+    if not config.INTERNAL_API_KEY:
+        raise HTTPException(status_code=503, detail="internal_api_not_configured")
+    if not hmac.compare_digest(x_internal_key, config.INTERNAL_API_KEY):
+        raise HTTPException(status_code=401, detail="invalid_internal_key")
+
+
+class RegisterRequest(BaseModel):
+    email: str = Field(min_length=3, max_length=320)
+    password: str = Field(min_length=8, max_length=200)
+    name: Optional[str] = Field(default=None, max_length=200)
+
+
+class VerifyRequest(BaseModel):
+    email: str
+    password: str
+
+
+class GoogleSignInRequest(BaseModel):
+    sub: str = Field(min_length=1, max_length=255)
+    email: str = Field(min_length=3, max_length=320)
+    name: Optional[str] = Field(default=None, max_length=200)
+    picture: Optional[str] = Field(default=None, max_length=1000)
+
+
+class SubscriptionUpdate(BaseModel):
+    user_id: Optional[int] = None
+    stripe_customer_id: Optional[str] = None
+    stripe_subscription_id: Optional[str] = None
+    plan: Optional[str] = None
+    status: Optional[str] = None
+    current_period_end: Optional[int] = None  # unix seconds, as Stripe sends it
+    cancel_at_period_end: Optional[bool] = None
+
+
+@app.post("/internal/auth/register", dependencies=[Depends(_require_internal_key)])
+def internal_register(body: RegisterRequest) -> dict:
+    with get_cursor() as cur:
+        try:
+            user = accounts.register(cur, body.email, body.password, body.name)
+        except accounts.EmailTaken:
+            raise HTTPException(status_code=409, detail="email_taken")
+        return {"user": accounts.public_user(cur, user)}
+
+
+@app.post("/internal/auth/verify", dependencies=[Depends(_require_internal_key)])
+def internal_verify(body: VerifyRequest) -> dict:
+    with get_cursor(commit=False) as cur:
+        user = accounts.verify_login(cur, body.email, body.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="invalid_credentials")
+    with get_cursor(commit=False) as cur:
+        return {"user": accounts.public_user(cur, user)}
+
+
+@app.post("/internal/auth/google", dependencies=[Depends(_require_internal_key)])
+def internal_google_sign_in(body: GoogleSignInRequest) -> dict:
+    with get_cursor() as cur:
+        user = accounts.google_sign_in(cur, body.sub, body.email, body.name, body.picture)
+        return {"user": accounts.public_user(cur, user)}
+
+
+@app.get("/internal/auth/users/{user_id}", dependencies=[Depends(_require_internal_key)])
+def internal_get_user(user_id: int) -> dict:
+    with get_cursor(commit=False) as cur:
+        user = users_repo.get_by_id(cur, user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="user_not_found")
+        return {"user": accounts.public_user(cur, user)}
+
+
+@app.post("/internal/billing/subscription", dependencies=[Depends(_require_internal_key)])
+def internal_update_subscription(body: SubscriptionUpdate) -> dict:
+    """
+    Upsert subscription state from Stripe webhook/checkout data. Identifies the
+    user by user_id when known (checkout) or by stripe_customer_id (webhooks).
+    """
+    period_end = (
+        datetime.fromtimestamp(body.current_period_end, tz=timezone.utc)
+        if body.current_period_end
+        else None
+    )
+    with get_cursor() as cur:
+        user_id = body.user_id
+        if user_id is None:
+            if not body.stripe_customer_id:
+                raise HTTPException(status_code=422, detail="user_id_or_customer_required")
+            sub = users_repo.get_subscription_by_customer(cur, body.stripe_customer_id)
+            if not sub:
+                raise HTTPException(status_code=404, detail="customer_not_found")
+            user_id = sub["user_id"]
+        elif not users_repo.get_by_id(cur, user_id):
+            raise HTTPException(status_code=404, detail="user_not_found")
+
+        updated = users_repo.upsert_subscription(
+            cur,
+            user_id,
+            stripe_customer_id=body.stripe_customer_id,
+            stripe_subscription_id=body.stripe_subscription_id,
+            plan=body.plan,
+            status=body.status,
+            current_period_end=period_end,
+            cancel_at_period_end=body.cancel_at_period_end,
+        )
+        return {
+            "user_id": user_id,
+            "plan": accounts.effective_plan(updated),
+            "subscription": updated and {
+                "status": updated["status"],
+                "plan": updated["plan"],
+                "stripe_customer_id": updated["stripe_customer_id"],
+                "cancel_at_period_end": updated["cancel_at_period_end"],
+            },
+        }
