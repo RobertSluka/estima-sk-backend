@@ -1,5 +1,7 @@
 """users repository — accounts and their Stripe subscription state."""
 
+# Bare column names only: list_with_subscription() builds its SELECT by
+# prefixing each of these with "u.", so no expressions/aliases here.
 USER_COLUMNS = "id, email, name, picture_url, google_sub, role, pro_override, created_at"
 
 
@@ -38,6 +40,45 @@ def get_password_hash(cur, email: str) -> str | None:
     cur.execute("SELECT password_hash FROM users WHERE email = %s", (email,))
     row = cur.fetchone()
     return row["password_hash"] if row else None
+
+
+def get_password_hash_by_id(cur, user_id: int) -> str | None:
+    cur.execute("SELECT password_hash FROM users WHERE id = %s", (user_id,))
+    row = cur.fetchone()
+    return row["password_hash"] if row else None
+
+
+def has_password(cur, user_id: int) -> bool:
+    cur.execute(
+        "SELECT password_hash IS NOT NULL AS ok FROM users WHERE id = %s", (user_id,)
+    )
+    row = cur.fetchone()
+    return bool(row and row["ok"])
+
+
+def update_profile(cur, user_id: int, name: str | None = None) -> dict | None:
+    """Self-service profile edit. None args leave that column untouched."""
+    cur.execute(
+        f"""
+        UPDATE users
+        SET name = COALESCE(%s, name),
+            updated_at = NOW()
+        WHERE id = %s
+        RETURNING {USER_COLUMNS}
+        """,
+        (name, user_id),
+    )
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+
+def set_password(cur, user_id: int, password_hash: str) -> bool:
+    """Set (or replace) a user's password hash. Returns True if the user exists."""
+    cur.execute(
+        "UPDATE users SET password_hash = %s, updated_at = NOW() WHERE id = %s",
+        (password_hash, user_id),
+    )
+    return cur.rowcount > 0
 
 
 def get_by_google_sub(cur, google_sub: str) -> dict | None:

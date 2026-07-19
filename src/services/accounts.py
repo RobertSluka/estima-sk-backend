@@ -34,6 +34,11 @@ class EmailTaken(Exception):
     pass
 
 
+class BadPassword(Exception):
+    """Raised when a password change fails its current-password check."""
+    pass
+
+
 def hash_password(password: str) -> str:
     salt = secrets.token_bytes(16)
     dk = hashlib.scrypt(
@@ -126,11 +131,42 @@ def public_user(cur, user: dict) -> dict:
         "name": user.get("name"),
         "picture_url": user.get("picture_url"),
         "has_google": bool(user.get("google_sub")),
+        "has_password": users.has_password(cur, user["id"]),
         "role": user.get("role") or "user",
         "pro_override": bool(user.get("pro_override")),
         "plan": entitled_plan(user, sub),
         "subscription": _public_subscription(sub),
     }
+
+
+def update_profile(cur, user_id: int, name: str | None = None) -> dict | None:
+    """Self-service profile edit. Returns the refreshed public payload, or None
+    if the user does not exist."""
+    updated = users.update_profile(cur, user_id, name=name)
+    if not updated:
+        return None
+    return public_user(cur, updated)
+
+
+def change_password(
+    cur, user_id: int, new_password: str, current_password: str | None = None
+) -> dict | None:
+    """
+    Change a user's password. Accounts that already have a password must supply
+    the correct current one; a Google-only account (no password yet) may set an
+    initial password without it. Returns the public payload, None if the user
+    doesn't exist, or raises BadPassword on a wrong current password.
+    """
+    if not users.get_by_id(cur, user_id):
+        return None
+    # An account that already has a password must prove the current one; a
+    # Google-only account (no password yet) may set an initial one without it.
+    current_hash = users.get_password_hash_by_id(cur, user_id)
+    if current_hash and not verify_password(current_password or "", current_hash):
+        raise BadPassword()
+    users.set_password(cur, user_id, hash_password(new_password))
+    refreshed = users.get_by_id(cur, user_id)
+    return public_user(cur, refreshed)
 
 
 def set_access(

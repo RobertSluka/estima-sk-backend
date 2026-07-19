@@ -721,6 +721,15 @@ class AccessUpdate(BaseModel):
     pro_override: Optional[bool] = None
 
 
+class ProfileUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, max_length=200)
+
+
+class PasswordChange(BaseModel):
+    new_password: str = Field(min_length=8, max_length=200)
+    current_password: Optional[str] = Field(default=None, max_length=200)
+
+
 @app.post("/internal/auth/register", dependencies=[Depends(_require_internal_key)])
 def internal_register(body: RegisterRequest) -> dict:
     with get_cursor() as cur:
@@ -755,6 +764,34 @@ def internal_get_user(user_id: int) -> dict:
         if not user:
             raise HTTPException(status_code=404, detail="user_not_found")
         return {"user": accounts.public_user(cur, user)}
+
+
+@app.patch("/internal/auth/users/{user_id}/profile", dependencies=[Depends(_require_internal_key)])
+def internal_update_profile(user_id: int, body: ProfileUpdate) -> dict:
+    """Self-service: a user edits their own display name."""
+    name = body.name.strip() if body.name and body.name.strip() else None
+    if name is None:
+        raise HTTPException(status_code=422, detail="no_fields")
+    with get_cursor() as cur:
+        updated = accounts.update_profile(cur, user_id, name)
+        if not updated:
+            raise HTTPException(status_code=404, detail="user_not_found")
+        return {"user": updated}
+
+
+@app.post("/internal/auth/users/{user_id}/password", dependencies=[Depends(_require_internal_key)])
+def internal_change_password(user_id: int, body: PasswordChange) -> dict:
+    """Self-service: change (or, for a Google-only account, set) the password."""
+    with get_cursor() as cur:
+        try:
+            updated = accounts.change_password(
+                cur, user_id, body.new_password, body.current_password
+            )
+        except accounts.BadPassword:
+            raise HTTPException(status_code=403, detail="wrong_password")
+        if not updated:
+            raise HTTPException(status_code=404, detail="user_not_found")
+        return {"user": updated}
 
 
 @app.get("/internal/users", dependencies=[Depends(_require_internal_key)])

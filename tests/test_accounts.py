@@ -166,6 +166,48 @@ def test_list_users_paginates_and_searches(db):
     assert filtered["users"][0]["email"] == "bob@example.com"
 
 
+# --- self-service profile & password ----------------------------------------
+
+@pytest.mark.db
+def test_update_profile_changes_name(db):
+    user = accounts.register(db, "profile@example.com", "password-123", "Old Name")
+    updated = accounts.update_profile(db, user["id"], "New Name")
+    assert updated["name"] == "New Name"
+    assert updated["email"] == "profile@example.com"  # unchanged
+    assert accounts.update_profile(db, 9_999_999, "x") is None
+
+
+@pytest.mark.db
+def test_change_password_requires_correct_current(db):
+    user = accounts.register(db, "pw@example.com", "original-pass")
+    assert user  # created
+
+    with pytest.raises(accounts.BadPassword):
+        accounts.change_password(db, user["id"], "new-password-1", "wrong-current")
+
+    updated = accounts.change_password(db, user["id"], "new-password-1", "original-pass")
+    assert updated is not None
+    # old password no longer works, new one does
+    assert accounts.verify_login(db, "pw@example.com", "original-pass") is None
+    assert accounts.verify_login(db, "pw@example.com", "new-password-1")["id"] == user["id"]
+
+
+@pytest.mark.db
+def test_google_only_account_can_set_initial_password(db):
+    gu = accounts.google_sign_in(db, "gsub-pw", "gonly@example.com", "G Only")
+    assert accounts.public_user(db, gu)["has_password"] is False
+
+    # No current password required for a first-time set.
+    updated = accounts.change_password(db, gu["id"], "brand-new-pass")
+    assert updated["has_password"] is True
+    assert accounts.verify_login(db, "gonly@example.com", "brand-new-pass")["id"] == gu["id"]
+
+
+@pytest.mark.db
+def test_change_password_missing_user(db):
+    assert accounts.change_password(db, 9_999_999, "whatever-pass") is None
+
+
 # --- internal API key guard (no DB) -----------------------------------------
 
 client = TestClient(app)
