@@ -109,6 +109,14 @@ def effective_plan(subscription: dict | None) -> str:
     return "basic"
 
 
+def entitled_plan(user: dict, subscription: dict | None) -> str:
+    """Effective plan including access an admin has granted outside Stripe:
+    admins and pro_override users always resolve to Pro."""
+    if user.get("role") == "admin" or user.get("pro_override"):
+        return "pro"
+    return effective_plan(subscription)
+
+
 def public_user(cur, user: dict) -> dict:
     """User payload for the frontend: profile + subscription + effective plan."""
     sub = users.get_subscription(cur, user["id"])
@@ -118,9 +126,53 @@ def public_user(cur, user: dict) -> dict:
         "name": user.get("name"),
         "picture_url": user.get("picture_url"),
         "has_google": bool(user.get("google_sub")),
-        "plan": effective_plan(sub),
+        "role": user.get("role") or "user",
+        "pro_override": bool(user.get("pro_override")),
+        "plan": entitled_plan(user, sub),
         "subscription": _public_subscription(sub),
     }
+
+
+def set_access(
+    cur, user_id: int, role: str | None = None, pro_override: bool | None = None
+) -> dict | None:
+    """Admin-only update of a user's role / Pro override. Returns the refreshed
+    public payload, or None if the user does not exist."""
+    if role is not None and role not in ("user", "admin"):
+        raise ValueError("role must be 'user' or 'admin'")
+    updated = users.set_access(cur, user_id, role=role, pro_override=pro_override)
+    if not updated:
+        return None
+    return public_user(cur, updated)
+
+
+def list_users(cur, limit: int, offset: int, q: str | None = None) -> dict:
+    """Paginated user directory for the admin table."""
+    rows = users.list_with_subscription(cur, limit, offset, q)
+    total = users.count_all(cur, q)
+    items = []
+    for r in rows:
+        sub = (
+            {"status": r["sub_status"], "plan": r["sub_plan"]}
+            if r.get("sub_status")
+            else None
+        )
+        created = r.get("created_at")
+        items.append(
+            {
+                "id": r["id"],
+                "email": r["email"],
+                "name": r.get("name"),
+                "picture_url": r.get("picture_url"),
+                "has_google": bool(r.get("google_sub")),
+                "role": r.get("role") or "user",
+                "pro_override": bool(r.get("pro_override")),
+                "plan": entitled_plan(r, sub),
+                "sub_status": r.get("sub_status"),
+                "created_at": created.isoformat() if created else None,
+            }
+        )
+    return {"users": items, "total": total, "limit": limit, "offset": offset}
 
 
 def _public_subscription(sub: dict | None) -> dict | None:

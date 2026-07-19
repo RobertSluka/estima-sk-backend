@@ -51,6 +51,19 @@ def test_effective_plan(sub, expected):
     assert accounts.effective_plan(sub) == expected
 
 
+@pytest.mark.parametrize(
+    "user,sub,expected",
+    [
+        ({"role": "user", "pro_override": False}, None, "basic"),
+        ({"role": "user", "pro_override": True}, None, "pro"),
+        ({"role": "admin", "pro_override": False}, None, "pro"),
+        ({"role": "user", "pro_override": False}, {"status": "active", "plan": "pro"}, "pro"),
+    ],
+)
+def test_entitled_plan(user, sub, expected):
+    assert accounts.entitled_plan(user, sub) == expected
+
+
 # --- account flows (DB, rolled back) ----------------------------------------
 
 @pytest.mark.db
@@ -100,6 +113,57 @@ def test_subscription_upsert_partial_updates(db):
     public = accounts.public_user(db, user)
     assert public["plan"] == "pro"
     assert "password_hash" not in public
+
+
+# --- roles & admin-granted access -------------------------------------------
+
+@pytest.mark.db
+def test_new_users_default_to_basic_non_admin(db):
+    user = accounts.register(db, "plain@example.com", "password-123")
+    public = accounts.public_user(db, user)
+    assert public["role"] == "user"
+    assert public["pro_override"] is False
+    assert public["plan"] == "basic"
+
+
+@pytest.mark.db
+def test_set_access_grants_pro_and_admin(db):
+    user = accounts.register(db, "grantee@example.com", "password-123")
+
+    granted = accounts.set_access(db, user["id"], pro_override=True)
+    assert granted["pro_override"] is True
+    assert granted["plan"] == "pro"
+
+    promoted = accounts.set_access(db, user["id"], role="admin")
+    assert promoted["role"] == "admin"
+    assert promoted["pro_override"] is True  # untouched by the role-only update
+
+    revoked = accounts.set_access(db, user["id"], role="user", pro_override=False)
+    assert revoked["plan"] == "basic"
+
+
+@pytest.mark.db
+def test_set_access_rejects_bad_role_and_missing_user(db):
+    user = accounts.register(db, "role@example.com", "password-123")
+    with pytest.raises(ValueError):
+        accounts.set_access(db, user["id"], role="superuser")
+    assert accounts.set_access(db, 9_999_999, pro_override=True) is None
+
+
+@pytest.mark.db
+def test_list_users_paginates_and_searches(db):
+    a = accounts.register(db, "alice@example.com", "password-123", "Alice")
+    accounts.register(db, "bob@example.com", "password-123", "Bob")
+    accounts.set_access(db, a["id"], pro_override=True)
+
+    everyone = accounts.list_users(db, limit=50, offset=0)
+    assert everyone["total"] >= 2
+    alice_row = next(u for u in everyone["users"] if u["email"] == "alice@example.com")
+    assert alice_row["plan"] == "pro"
+
+    filtered = accounts.list_users(db, limit=50, offset=0, q="bob")
+    assert filtered["total"] == 1
+    assert filtered["users"][0]["email"] == "bob@example.com"
 
 
 # --- internal API key guard (no DB) -----------------------------------------

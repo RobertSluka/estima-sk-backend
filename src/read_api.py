@@ -716,6 +716,11 @@ class SubscriptionUpdate(BaseModel):
     cancel_at_period_end: Optional[bool] = None
 
 
+class AccessUpdate(BaseModel):
+    role: Optional[str] = Field(default=None, pattern="^(user|admin)$")
+    pro_override: Optional[bool] = None
+
+
 @app.post("/internal/auth/register", dependencies=[Depends(_require_internal_key)])
 def internal_register(body: RegisterRequest) -> dict:
     with get_cursor() as cur:
@@ -750,6 +755,35 @@ def internal_get_user(user_id: int) -> dict:
         if not user:
             raise HTTPException(status_code=404, detail="user_not_found")
         return {"user": accounts.public_user(cur, user)}
+
+
+@app.get("/internal/users", dependencies=[Depends(_require_internal_key)])
+def internal_list_users(
+    limit: int = 50, offset: int = 0, q: Optional[str] = None
+) -> dict:
+    """Paginated user directory for the admin table (newest first)."""
+    limit = max(1, min(limit, 200))
+    offset = max(0, offset)
+    query = q.strip() if q and q.strip() else None
+    with get_cursor(commit=False) as cur:
+        return accounts.list_users(cur, limit, offset, query)
+
+
+@app.patch("/internal/users/{user_id}", dependencies=[Depends(_require_internal_key)])
+def internal_set_user_access(user_id: int, body: AccessUpdate) -> dict:
+    """Admin-only: grant/revoke Pro access or the admin role for a user."""
+    if body.role is None and body.pro_override is None:
+        raise HTTPException(status_code=422, detail="no_fields")
+    with get_cursor() as cur:
+        try:
+            updated = accounts.set_access(
+                cur, user_id, role=body.role, pro_override=body.pro_override
+            )
+        except ValueError:
+            raise HTTPException(status_code=422, detail="invalid_role")
+        if not updated:
+            raise HTTPException(status_code=404, detail="user_not_found")
+        return {"user": updated}
 
 
 @app.post("/internal/billing/subscription", dependencies=[Depends(_require_internal_key)])

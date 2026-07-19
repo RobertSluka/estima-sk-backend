@@ -1,6 +1,6 @@
 """users repository — accounts and their Stripe subscription state."""
 
-USER_COLUMNS = "id, email, name, picture_url, google_sub, created_at"
+USER_COLUMNS = "id, email, name, picture_url, google_sub, role, pro_override, created_at"
 
 
 def create(
@@ -76,6 +76,65 @@ def refresh_google_profile(cur, user_id: int, name: str | None, picture_url: str
         (name, picture_url, user_id),
     )
     return dict(cur.fetchone())
+
+
+def set_access(
+    cur, user_id: int, role: str | None = None, pro_override: bool | None = None
+) -> dict | None:
+    """Admin update of a user's access. None args leave that column untouched."""
+    cur.execute(
+        f"""
+        UPDATE users
+        SET role         = COALESCE(%s, role),
+            pro_override = COALESCE(%s, pro_override),
+            updated_at   = NOW()
+        WHERE id = %s
+        RETURNING {USER_COLUMNS}
+        """,
+        (role, pro_override, user_id),
+    )
+    row = cur.fetchone()
+    return dict(row) if row else None
+
+
+def list_with_subscription(
+    cur, limit: int, offset: int, q: str | None = None
+) -> list[dict]:
+    """Users joined with their subscription summary, newest first, for the
+    admin table. Optional case-insensitive filter over e-mail and name."""
+    where = ""
+    params: list = []
+    if q:
+        where = "WHERE u.email ILIKE %s OR u.name ILIKE %s"
+        like = f"%{q}%"
+        params += [like, like]
+    params += [limit, offset]
+    cur.execute(
+        f"""
+        SELECT {', '.join('u.' + c for c in USER_COLUMNS.split(', '))},
+               s.status AS sub_status, s.plan AS sub_plan,
+               s.current_period_end, s.cancel_at_period_end
+        FROM users u
+        LEFT JOIN subscriptions s ON s.user_id = u.id
+        {where}
+        ORDER BY u.created_at DESC, u.id DESC
+        LIMIT %s OFFSET %s
+        """,
+        params,
+    )
+    return [dict(r) for r in cur.fetchall()]
+
+
+def count_all(cur, q: str | None = None) -> int:
+    if q:
+        like = f"%{q}%"
+        cur.execute(
+            "SELECT COUNT(*) AS n FROM users WHERE email ILIKE %s OR name ILIKE %s",
+            (like, like),
+        )
+    else:
+        cur.execute("SELECT COUNT(*) AS n FROM users")
+    return int(cur.fetchone()["n"])
 
 
 def get_subscription(cur, user_id: int) -> dict | None:
