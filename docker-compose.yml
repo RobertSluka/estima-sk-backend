@@ -47,6 +47,9 @@ services:
       # Photo-quality scoring service (estima-vision / heuristic-cv). Empty
       # keeps the config.py default; reports degrade gracefully without it.
       VISION_SERVICE_URL: ${VISION_SERVICE_URL:-}
+      # Shared secret guarding the /internal/* account endpoints used by the
+      # estima-sk frontend; accounts stay disabled while empty. See .env.example.
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
     volumes:
       - .:/app
 
