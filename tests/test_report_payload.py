@@ -127,7 +127,7 @@ def test_assemble_maps_core_fields():
     assert len(doc["comparables"]) == 2
     assert doc["comparables"][0]["is_subject"] is True
     assert doc["summary"]["headline"] == "Fairly priced"
-    assert doc["options"] == {"template": "default", "language": "en"}
+    assert doc["options"] == {"template": "estima", "language": "en"}
 
 
 def test_assemble_market_statistics_uses_kosice_series_and_subject():
@@ -198,3 +198,45 @@ def test_assemble_vision_carries_photo_quality_signals_only():
     assert "overall_condition_score" not in vision
     assert "renovation_score" not in vision
     assert "price_adjustment" not in vision
+
+
+# --------------------------------------------------------------------------- #
+# Buy-vs-rent projection
+# --------------------------------------------------------------------------- #
+
+def _rent_distribution() -> dict:
+    return {"median": Decimal("11.5"), "sample_size": 24}
+
+
+def test_assemble_buy_vs_rent_projects_from_rent_median():
+    doc = payload.assemble(
+        _report(), _row(), distribution=None, rent_distribution=_rent_distribution()
+    )
+
+    bvr = doc["buy_vs_rent"]
+    a = bvr["assumptions"]
+    # 11.5 €/m²/month × 63.5 m² → 730 €/month.
+    assert a["monthly_rent"] == 730.0
+    assert a["property_price"] == 178000.0
+    assert a["property_growth_pct"] == 7.6  # Košice → KE
+    assert "Košice Region" in a["growth_source"]
+    # 31 yearly points, year 0 first; finals mirror the last point.
+    assert len(bvr["series"]) == 31
+    assert bvr["series"][0]["year"] == 0
+    assert bvr["buyer_final"] == bvr["series"][-1]["buyer"]
+    assert bvr["renter_final"] == bvr["series"][-1]["renter"]
+    # 80% LTV of 178k: 35.6k down payment; annuity ≈ 680 €/month at 4%/30y.
+    assert bvr["down_payment"] == 35600
+    assert 675 <= bvr["monthly_payment"] <= 685
+
+
+def test_assemble_buy_vs_rent_omitted_without_rent_data_or_for_rent_listings():
+    doc = payload.assemble(_report(), _row(), distribution=None)
+    assert doc["buy_vs_rent"] is None
+
+    rent_report = _report()
+    rent_report.property.deal_type = DealType.RENT
+    doc = payload.assemble(
+        rent_report, _row(), distribution=None, rent_distribution=_rent_distribution()
+    )
+    assert doc["buy_vs_rent"] is None

@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 
 from src.db import get_cursor
 from src.repositories import properties as properties_repo
-from src.services.reports import builder, nbs
+from src.services.reports import builder, buy_vs_rent, nbs
 from src.services.reports.schema import DealType, ReportData
 
 
@@ -40,12 +40,30 @@ def build_payload(property_id: int, lang: str = "en") -> dict:
             deal_type=row.get("deal_type"),
             category=row.get("category"),
         )
+        # Rent-listing median of the same district/category — feeds the
+        # buy-vs-rent projection's rent estimate (sale listings only).
+        rent_distribution = (
+            properties_repo.price_per_sqm_distribution(
+                cur,
+                district=row.get("district"),
+                deal_type="rent",
+                category=row.get("category"),
+            )
+            if report.property.deal_type != DealType.RENT
+            else None
+        )
 
-    return assemble(report, row, distribution, lang=lang)
+    return assemble(
+        report, row, distribution, rent_distribution=rent_distribution, lang=lang
+    )
 
 
 def assemble(
-    report: ReportData, row: dict, distribution: dict | None, lang: str = "en"
+    report: ReportData,
+    row: dict,
+    distribution: dict | None,
+    rent_distribution: dict | None = None,
+    lang: str = "en",
 ) -> dict:
     """Pure mapping of ``ReportData`` + property row (+ optional distribution)
     to the report-service payload dict. Split from ``build_payload`` so it can
@@ -81,6 +99,7 @@ def assemble(
         ],
         "market_statistics": _market_statistics_block(report, row, distribution),
         "benchmarks": _benchmarks_block(report, row),
+        "buy_vs_rent": _buy_vs_rent_block(report, row, rent_distribution),
         "vision_analysis": _vision_block(report),
         "location_facilities": _location_block(report),
         "summary": {
@@ -200,6 +219,23 @@ def _benchmarks_block(report: ReportData, row: dict) -> list[dict]:
         )
 
     return entries
+
+
+def _buy_vs_rent_block(
+    report: ReportData, row: dict, rent_distribution: dict | None
+) -> dict | None:
+    """Buy-vs-rent projection — sale listings only, priced off the asking
+    price; None (section skipped) when there is no honest rent estimate."""
+    prop = report.property
+    if prop.deal_type == DealType.RENT:
+        return None
+    return buy_vs_rent.block(
+        property_price=prop.price,
+        floor_area=prop.floor_area,
+        district=row.get("district"),
+        city=row.get("city"),
+        rent_distribution=rent_distribution,
+    )
 
 
 def _vision_block(report: ReportData) -> dict:
