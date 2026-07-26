@@ -498,6 +498,27 @@ def property_report_pdf(
     )
 
 
+@app.get("/reports/properties/{property_id}/analysis")
+def property_report_analysis(
+    property_id: int,
+    lang: str = Query("en", description="Report language: 'en', 'cs' or 'sk'"),
+) -> dict:
+    """The real report evaluation as JSON — the same ReportData the PDF
+    renders (comparables-based estimate, market analysis, vision, location,
+    recommendation). Lets the frontend show genuine numbers (e.g. the Analýzy
+    model-example card) instead of its derived preview. Returns 404 if the
+    property doesn't exist."""
+    # Imported lazily for the same reason as the PDF endpoint: keep the read
+    # API importable where the report stack's native deps are absent.
+    from src.services.reports.builder import PropertyNotFound, build_report
+
+    try:
+        report = build_report(property_id, lang=lang)
+    except PropertyNotFound:
+        raise HTTPException(status_code=404, detail=f"Property {property_id} not found")
+    return report.model_dump(mode="json")
+
+
 def _render_via_report_service(property_id: int, lang: str) -> bytes | None:
     """Render one property's PDF through estima-report-service.
 
