@@ -10,12 +10,16 @@ subject property marked on it.
 
 Only mapping lives here — no rendering, no new valuation logic. The vision
 mapping deliberately carries photo-quality signals only (no condition or
-renovation claims; report wording is estimates only).
+renovation claims; report wording is estimates only). The single exception is
+the checked-in showcase enrichment overlay (``_apply_showcase_enrichment``):
+human-reviewed, locally-authored descriptive data for the free example report.
 """
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
+from pathlib import Path
 
 from src.db import get_cursor
 from src.repositories import properties as properties_repo
@@ -53,9 +57,41 @@ def build_payload(property_id: int, lang: str = "en") -> dict:
             else None
         )
 
-    return assemble(
+    result = assemble(
         report, row, distribution, rent_distribution=rent_distribution, lang=lang
     )
+    return _apply_showcase_enrichment(result, property_id)
+
+
+_ENRICHMENT_DIR = Path(__file__).parent / "showcase_enrichment"
+
+
+def _apply_showcase_enrichment(payload: dict, property_id: int) -> dict:
+    """Overlay the locally-authored photo evaluation for showcase properties.
+
+    Authored once on a workstation by a local VLM (see estima-report-service
+    ``scripts/evaluate_photos_ollama.py``) and checked in as data — the server
+    never runs a model. Applied only when an enrichment file exists for this
+    property id, so all other reports are untouched. Skipped when the live
+    gallery no longer matches the evaluated URLs (photos changed → the
+    assessment would describe pictures that are no longer in the report).
+    """
+    path = _ENRICHMENT_DIR / f"{property_id}.json"
+    if not path.is_file():
+        return payload
+    data = json.loads(path.read_text(encoding="utf-8"))
+
+    metrics = data.get("vision_analysis_image_metrics") or []
+    evaluated = {m.get("url") for m in metrics}
+    live = set(payload.get("property", {}).get("images") or [])
+    if not evaluated & live:
+        return payload  # gallery replaced since evaluation — stale, drop it
+
+    va = payload.setdefault("vision_analysis", {"available": False})
+    va["image_metrics"] = metrics
+    if data.get("condition_assessment"):
+        payload["condition_assessment"] = data["condition_assessment"]
+    return payload
 
 
 def assemble(

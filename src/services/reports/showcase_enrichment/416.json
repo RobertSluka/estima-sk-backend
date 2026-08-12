@@ -1,0 +1,140 @@
+{
+  "_comment": "Showcase enrichment for property 416 (Kosice/Odborarska), authored by gemma3:27b via estima-report-service/scripts/evaluate_photos_ollama.py on 2026-08-11. Merged into build_payload output for the pinned showcase only.",
+  "vision_analysis_image_metrics": [
+    {
+      "url": "https://www.bazos.sk/img/1/291/193231291.jpg",
+      "photo_quality": 70,
+      "brightness": 51,
+      "sharpness": 64,
+      "note": "Obývacia izba – priestranný byt s moderným nábytkom a svetlými farbami; vizualizácia/home staging."
+    },
+    {
+      "url": "https://www.bazos.sk/img/2/291/193231291.jpg",
+      "photo_quality": 70,
+      "brightness": 49,
+      "sharpness": 61,
+      "note": "Spálňa — priestranná spálňa s manželskou posteľou a moderným zariadením (pravdepodobne virtuálny home staging)."
+    },
+    {
+      "url": "https://www.bazos.sk/img/3/291/193231291.jpg",
+      "photo_quality": 74,
+      "brightness": 50,
+      "sharpness": 70,
+      "note": "Kuchyňa — Moderná kuchynská linka a spotrebiče, byt pôsobí novo zriadený/virtuálny home staging."
+    },
+    {
+      "url": "https://www.bazos.sk/img/4/291/193231291.jpg",
+      "photo_quality": 65,
+      "brightness": 56,
+      "sharpness": 54,
+      "note": "Obývacia izba/záber z interiéru — prázdna miestnosť s laminátovou podlahou a oknami, pôsobí ako virtuálny home staging."
+    },
+    {
+      "url": "https://www.bazos.sk/img/5/291/193231291.jpg",
+      "photo_quality": 65,
+      "brightness": 54,
+      "sharpness": 53,
+      "note": "Obývacia izba/záber z priestoru — prázdna izba s drevenou podlahou a oknami, pôsobí ako virtuálny home staging."
+    },
+    {
+      "url": "https://www.bazos.sk/img/6/291/193231291.jpg",
+      "photo_quality": 67,
+      "brightness": 62,
+      "sharpness": 60,
+      "note": "Obývacia izba/záber — Prázdna izba s laminátovou podlahou a bielymi stenami, vidno elektrické zásuvky a radiátor."
+    },
+    {
+      "url": "https://www.bazos.sk/img/7/291/193231291.jpg",
+      "photo_quality": 68,
+      "brightness": 60,
+      "sharpness": 61,
+      "note": "Obývacia izba/záber z rohu — prázdna miestnosť s laminátovou podlahou a bielymi stenami, radiátor pod oknom."
+    },
+    {
+      "url": "https://www.bazos.sk/img/8/291/193231291.jpg",
+      "photo_quality": 72,
+      "brightness": 55,
+      "sharpness": 79,
+      "note": "Kúpeľňa — moderná kúpeľňa so sprchovacím kútom a umývadlom, pravdepodobne virtuálny home staging."
+    },
+    {
+      "url": "https://www.bazos.sk/img/9/291/193231291.jpg",
+      "photo_quality": 71,
+      "brightness": 57,
+      "sharpness": 79,
+      "note": "Kúpeľňa — záber sprchového kúta s dverami a obkladom, pôsobí moderne a udržiavaný."
+    },
+    {
+      "url": "https://www.bazos.sk/img/10/291/193231291.jpg",
+      "photo_quality": 64,
+      "brightness": 56,
+      "sharpness": 52,
+      "note": "Kúpeľňa — záber na WC s moderným obkladom a dlažbou, pravdepodobne virtuálny home staging."
+    },
+    {
+      "url": "https://www.bazos.sk/img/11/291/193231291.jpg",
+      "photo_quality": 83,
+      "brightness": 44,
+      "sharpness": 91,
+      "note": "Exteriér — Pohľad na rieku a brehy s vegetáciou. Ide o záber z okolia lokality bytu v Košiciach."
+    },
+    {
+      "url": "https://www.bazos.sk/img/12/291/193231291.jpg",
+      "photo_quality": 84,
+      "brightness": 41,
+      "sharpness": 92,
+      "note": "Exteriér — Pohľad na park s trávnikom a stromami, pravdepodobne v blízkosti bytového domu."
+    },
+    {
+      "url": "https://www.bazos.sk/img/13/291/193231291.jpg",
+      "photo_quality": 66,
+      "brightness": 59,
+      "sharpness": 57,
+      "note": "Chodba — priestranná chodba s dvomi vchodmi do izieb a kúpeľne, byt pôsobí novo zrekonštruovane."
+    }
+  ],
+  "condition_assessment": {
+    "available": true,
+    "source": "Orientačné vyhodnotenie z fotografií inzerátu (Ollama gemma3:27b)",
+    "items": [
+      {
+        "element": "Podlahy",
+        "state": "Čiastočne po rekonštrukcii/Pôvodné",
+        "note": "Na fotografiách sú viditeľné laminátové aj drevené podlahy, čo naznačuje možnú kombináciu alebo čiastočnú výmenu."
+      },
+      {
+        "element": "Steny a stropy",
+        "state": "Po rekonštrukcii/Udržiavané",
+        "note": "Na fotografiách sú viditeľné biele steny, ktoré pôsobia novo namaľované alebo udržiavané."
+      },
+      {
+        "element": "Kuchyňa",
+        "state": "Po rekonštrukcii (pravdepodobne)",
+        "note": "Fotografie naznačujú modernú kuchynskú linku a spotrebiče, avšak je potrebné overiť skutočný stav na obhliadke, keďže ide pravdepodobne o vizualizáciu."
+      },
+      {
+        "element": "Kúpeľňa a WC",
+        "state": "Po rekonštrukcii (pravdepodobne)",
+        "note": "Kúpeľňa pôsobí moderne s novým obkladom a sprchovacím kútom, avšak je potrebné overiť skutočný stav na obhliadke, keďže ide pravdepodobne o vizualizáciu."
+      },
+      {
+        "element": "Okná",
+        "state": "Nejednoznačné z fotografií",
+        "note": "Na fotografiách sú viditeľné okná, ale nie je možné posúdiť ich stav (materiál, vek) bez bližšej obhliadky."
+      },
+      {
+        "element": "Vykurovanie",
+        "state": "Pôvodné/Udržiavané",
+        "note": "Na fotografiách sú viditeľné radiátory, ktoré pôsobia funkčne, ale nie je možné posúdiť ich vek alebo účinnosť."
+      },
+      {
+        "element": "Vstupné dvere",
+        "state": "Nejednoznačné z fotografií",
+        "note": "Na fotografiách vstupné dvere nie sú viditeľné."
+      }
+    ],
+    "summary": "Byt pôsobí svetlo a priestranne, s moderným zariadením. Vzhľadom na množstvo vizualizácií/home stagingu je však potrebné overiť skutočný stav nehnuteľnosti pri osobnej obhliadke. Kúpeľňa a kuchyňa vyzerajú po rekonštrukcii, no treba to potvrdiť.",
+    "overall_score": 65,
+    "overall_label": "Čiastočne renovovaný"
+  }
+}
