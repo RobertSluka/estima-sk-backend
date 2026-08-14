@@ -1,0 +1,109 @@
+{
+  "_comment": "Showcase enrichment for property 360 (Kosice/Tahanovce), authored by gemma3:27b via estima-report-service/scripts/evaluate_photos_ollama.py. Merged into build_payload output for the pinned showcase only.",
+  "vision_analysis_image_metrics": [
+    {
+      "url": "https://www.bazos.sk/img/1/692/192567692.jpg",
+      "note": "Obývačka/záber z diaľky — priestranná obývacia izba s moderným nábytkom a veľkými oknami."
+    },
+    {
+      "url": "https://www.bazos.sk/img/2/692/192567692.jpg",
+      "note": "Obývačka — priestranná obývačka s bielou sedačkou a tmavým nábytkom, v dobre udržiavanom stave."
+    },
+    {
+      "url": "https://www.bazos.sk/img/3/692/192567692.jpg",
+      "note": "Obývacia izba — priestranná obývačka s moderným nábytkom a svetlými stenami."
+    },
+    {
+      "url": "https://www.bazos.sk/img/4/692/192567692.jpg",
+      "note": "Obývačka — priestranná obývačka s pohovkou, konferenčným stolíkom a obrazmi na stene, vkusne zariadená."
+    },
+    {
+      "url": "https://www.bazos.sk/img/5/692/192567692.jpg",
+      "note": "Obývačka — priestranná sedačka s vankúšmi a konferenčný stolík, moderné zariadenie."
+    },
+    {
+      "url": "https://www.bazos.sk/img/6/692/192567692.jpg",
+      "note": "Obývacia izba — priestranná obývačka s pohovkou, skrinkou a oknami; byt pôsobí vkusne zariadeným dojmom."
+    },
+    {
+      "url": "https://www.bazos.sk/img/7/692/192567692.jpg",
+      "note": "Spálňa — zariadená s manželskou posteľou, komódami a televízorom; byt pôsobí v udržiavanom stave."
+    },
+    {
+      "url": "https://www.bazos.sk/img/8/692/192567692.jpg",
+      "note": "Spálňa — priestranná izba s manželskou posteľou a vstavanou skriňou, vkusne zariadená."
+    },
+    {
+      "url": "https://www.bazos.sk/img/9/692/192567692.jpg",
+      "note": "Spálňa — zariadená posteľou, nočnými stolíkmi, TV a osvetlením. Izba pôsobí vkusne a udržiavane."
+    },
+    {
+      "url": "https://www.bazos.sk/img/10/692/192567692.jpg",
+      "note": "Šijacia dielňa/záber — Priestor s pracovným stolom, šijacími strojmi a plánovacím stolom, vo funkčnom stave."
+    },
+    {
+      "url": "https://www.bazos.sk/img/11/692/192567692.jpg",
+      "note": "Obývacia izba — Pohľad na zariadenú obývaciu izbu s pohovkou a policami, byt pôsobí vkusne zariadeným dojmom."
+    },
+    {
+      "url": "https://www.bazos.sk/img/12/692/192567692.jpg",
+      "note": "Obývačka/záber — Pohovka s vankúšmi, knižnica a červená stena. Priestor pôsobí upravene."
+    }
+  ],
+  "condition_assessment": {
+    "available": true,
+    "source": "Orientačné vyhodnotenie z fotografií inzerátu (Ollama gemma3:27b)",
+    "items": [
+      {
+        "element": "Podlahy",
+        "state": "Nejednoznačné z fotografií",
+        "note": "Na fotografiách nie je dobre vidieť stav podláh."
+      },
+      {
+        "element": "Steny a stropy",
+        "state": "Po rekonštrukcii/Udržiavané",
+        "note": "Steny sú svetlé, vkusne maľované, jedna stena je červená, strop pôsobí udržiavane."
+      },
+      {
+        "element": "Kuchyňa",
+        "state": "Nejednoznačné z fotografií",
+        "note": "Na fotografiách nie je kuchyňa zachytená."
+      },
+      {
+        "element": "Kúpeľňa a WC",
+        "state": "Nejednoznačné z fotografií",
+        "note": "Na fotografiách nie je kúpeľňa ani WC zachytené."
+      },
+      {
+        "element": "Okná",
+        "state": "Udržiavané",
+        "note": "Viditeľné sú veľké okná, ktoré pôsožia v dobrom stave."
+      },
+      {
+        "element": "Vykurovanie",
+        "state": "Nejednoznačné z fotografií",
+        "note": "Na fotografiách nie je vykurovacie teleso zachytené."
+      },
+      {
+        "element": "Vstupné dvere",
+        "state": "Nejednoznačné z fotografií",
+        "note": "Na fotografiách vstupné dvere nie sú viditeľné."
+      }
+    ],
+    "summary": "Byt pôsobí priestranným a vkusne zariadeným dojmom. Obývacia izba a spálňa sú udržiavané, s moderným nábytkom. Chýbajú však informácie o stave kuchyne, kúpeľne a vykurovania.",
+    "overall_score": 65,
+    "overall_label": "Čiastočne renovovaný",
+    "score_positives": [
+      "Vkusné zariadenie obývacej izby",
+      "Udržiavaný stav spálne",
+      "Svetlé steny a moderný nábytok",
+      "Veľké okná v dobrom stave"
+    ],
+    "score_negatives": [
+      "Chýbajú informácie o kuchyni a kúpeľni",
+      "Nejednoznačný stav podláh",
+      "Nedostatok detailov o vykurovaní",
+      "Absencia vstupné dvere na fotografiách"
+    ]
+  }
+}

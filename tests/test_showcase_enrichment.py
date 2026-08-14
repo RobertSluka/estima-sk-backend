@@ -14,6 +14,9 @@ from src.services.reports import payload
 # staleness guard keys on evaluated∩live being non-empty.
 EVALUATED_URL = "https://www.bazos.sk/img/1/291/193231291.jpg"
 
+# Same, for showcase_enrichment/360.json.
+EVALUATED_URL_360 = "https://www.bazos.sk/img/1/692/192567692.jpg"
+
 
 def _base_payload(images: list[str]) -> dict:
     return {
@@ -45,4 +48,30 @@ def test_property_without_enrichment_file_is_unchanged():
 def test_stale_gallery_drops_enrichment():
     before = _base_payload(["https://www.bazos.sk/img/1/1/replaced-photo.jpg"])
     after = payload._apply_showcase_enrichment(copy.deepcopy(before), 416)
+    assert after == before
+
+
+def test_enrichment_applied_when_gallery_matches_360():
+    enriched = payload._apply_showcase_enrichment(_base_payload([EVALUATED_URL_360]), 360)
+
+    metrics = enriched["vision_analysis"]["image_metrics"]
+    assert len(metrics) == 12
+    assert all({"url", "note"} <= set(m) for m in metrics)
+
+    ca = enriched["condition_assessment"]
+    assert ca["available"] is True
+    assert ca["overall_score"] == 65
+    assert ca["overall_label"] == "Čiastočne renovovaný"
+    assert len(ca["items"]) == 7
+
+
+def test_property_without_enrichment_file_is_unchanged_360():
+    before = _base_payload([EVALUATED_URL_360])
+    after = payload._apply_showcase_enrichment(copy.deepcopy(before), 999999)
+    assert after == before
+
+
+def test_stale_gallery_drops_enrichment_360():
+    before = _base_payload(["https://www.bazos.sk/img/1/1/replaced-photo.jpg"])
+    after = payload._apply_showcase_enrichment(copy.deepcopy(before), 360)
     assert after == before
