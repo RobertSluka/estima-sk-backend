@@ -289,6 +289,27 @@
     font-size: 9pt; margin-bottom: 12pt;
   }
   .map-box img { width: 100%; height: 100%; object-fit: cover; }
+
+  /* Map with facility pictograms. The frame keeps the image's own aspect
+     ratio (height from the map_markers filter, against the page's 178mm
+     content width) so the pins sit exactly where the projection put them;
+     a border would eat into that width and skew them. */
+  .map-box.has-frame { display: block; height: auto; border: none; }
+  .map-frame { position: relative; }
+  .map-frame img { display: block; width: 100%; height: 100%; object-fit: fill; }
+  .map-pin {
+    position: absolute; width: 4.6mm; height: 4.6mm; margin: -2.3mm 0 0 -2.3mm;
+    border-radius: 50%; background: #fff; border: .3mm solid var(--brand);
+    color: var(--brand); text-align: center;
+  }
+  .map-pin svg { width: 2.6mm; height: 2.6mm; margin-top: .7mm; }
+  /* Repeat of the marker the map image already carries, drawn last so a
+     facility pin a few metres away cannot hide the subject property. */
+  .map-home {
+    position: absolute; left: 50%; top: 50%;
+    width: 3.9mm; height: 3.9mm; margin: -1.95mm 0 0 -1.95mm;
+    border-radius: 50%; background: var(--bad); border: .5mm solid #fff;
+  }
   .poi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10pt; }
   .poi {
     border: 1px solid var(--line); border-radius: 8px; padding: 10pt 12pt; background: #fff;
@@ -607,8 +628,25 @@
 <section class="section page-break">
   <div class="section-head"><span class="section-num">04</span><h2 class="section-title">{{ T.sec_location }}</h2></div>
   {% if r.location_analysis.available %}
-  <div class="map-box">
-    {% if r.location_analysis.static_map_url %}
+  {# Pin overlay only when the payload describes the image's map geometry;
+     otherwise the plain (cover-cropped) image, exactly as before. #}
+  {% set map_overlay = r.location_analysis | map_markers %}
+  <div class="map-box{% if r.location_analysis.static_map_url and map_overlay %} has-frame{% endif %}">
+    {% if r.location_analysis.static_map_url and map_overlay %}
+      <div class="map-frame" style="height:{{ map_overlay.height_mm }}mm">
+        <img src="{{ r.location_analysis.static_map_url | embed_image }}" alt="Map">
+        {% for m in map_overlay.markers %}
+        <span class="map-pin" style="left:{{ m.left_pct }}%; top:{{ m.top_pct }}%">{{ poi_icon(m.category) }}</span>
+        {% endfor %}
+        {# Only when the frame is genuinely centred on this property (the map
+           cache rounds the coordinate to 4 decimals). #}
+        {% if r.property.lat is not none and r.property.lon is not none
+           and (r.property.lat | round(4)) == r.location_analysis.map_center_lat
+           and (r.property.lon | round(4)) == r.location_analysis.map_center_lon %}
+        <span class="map-home"></span>
+        {% endif %}
+      </div>
+    {% elif r.location_analysis.static_map_url %}
       <img src="{{ r.location_analysis.static_map_url | embed_image }}" alt="Map">
     {% elif r.property.lat and r.property.lon %}
       {{ T.map_preview }} · {{ r.property.lat | num(4) }}, {{ r.property.lon | num(4) }}

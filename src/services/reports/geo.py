@@ -188,6 +188,10 @@ class NearestPoi:
     category: str  # transport | grocery | schools | parks | restaurants | healthcare
     name: str
     distance_m: int
+    # WGS84 position, so the report can draw the facility on the static map.
+    # Optional: POI caches written before this field existed replay without it.
+    lat: float | None = None
+    lon: float | None = None
 
 
 # (category key, tag filters, radius in metres) — the six categories the
@@ -269,7 +273,13 @@ def _parse_nearest_pois(payload: dict, lat: float, lon: float) -> list[NearestPo
         distance = round(_haversine_m(lat, lon, coords["lat"], coords["lon"]))
         current = best.get(category)
         if current is None or distance < current.distance_m:
-            best[category] = NearestPoi(category=category, name=name, distance_m=distance)
+            best[category] = NearestPoi(
+                category=category,
+                name=name,
+                distance_m=distance,
+                lat=coords["lat"],
+                lon=coords["lon"],
+            )
     return [best[cat] for cat, _, _ in _POI_CATEGORIES if cat in best]
 
 
@@ -445,6 +455,22 @@ def static_map_data_uri(lat: float, lon: float) -> str | None:
         logger.warning("Could not persist map cache %s: %s", disk_path, exc)
 
     return _remember_map(key, png)
+
+
+def static_map_geometry(lat: float, lon: float) -> dict:
+    """The frame `static_map_data_uri` renders for this coordinate.
+
+    Reported alongside the image so a consumer can place its own markers on
+    it (Web Mercator, centred on the *cache key* coordinate — the rounding
+    below is what the rendered tiles are actually centred on, up to ~11 m).
+    """
+    return {
+        "center_lat": round(lat, 4),
+        "center_lon": round(lon, 4),
+        "zoom": _MAP_ZOOM,
+        "width": _MAP_W,
+        "height": _MAP_H,
+    }
 
 
 def _remember_map(key: tuple[float, float], png: bytes) -> str:

@@ -791,11 +791,21 @@ def _build_location(
 
     map_uri = geo.static_map_data_uri(prop.lat, prop.lon)
     nearest = _nearest_facilities(prop.lat, prop.lon)
+    # Only describe the frame when there is an image to describe.
+    frame = geo.static_map_geometry(prop.lat, prop.lon) if map_uri else {}
+    map_fields = {
+        "map_center_lat": frame.get("center_lat"),
+        "map_center_lon": frame.get("center_lon"),
+        "map_zoom": frame.get("zoom"),
+        "map_width": frame.get("width"),
+        "map_height": frame.get("height"),
+    }
 
     if location_row is not None:
         return LocationAnalysis(
             available=True,
             static_map_url=map_uri,
+            **map_fields,
             **{field: location_row.get(field) for field in location_scores.COUNT_FIELDS},
             nearest_facilities=nearest,
             location_score=_f(location_row.get("location_score")),
@@ -807,6 +817,7 @@ def _build_location(
         return LocationAnalysis(
             available=True,
             static_map_url=map_uri,
+            **map_fields,
             nearest_facilities=nearest,
             explanation=i18n.prose(lang)["location_pending"],
         )
@@ -819,6 +830,7 @@ def _build_location(
     return LocationAnalysis(
         available=True,
         static_map_url=map_uri,
+        **map_fields,
         **fields,
         nearest_facilities=nearest,
         location_score=score,
@@ -831,7 +843,13 @@ def _nearest_facilities(lat: float, lon: float) -> list[NearestFacility]:
     empty showcase, never a failed report."""
     pois = geo.fetch_nearest_pois(lat, lon)
     return [
-        NearestFacility(category=p.category, name=p.name, distance_m=p.distance_m)
+        NearestFacility(
+            category=p.category,
+            name=p.name,
+            distance_m=p.distance_m,
+            lat=p.lat,
+            lon=p.lon,
+        )
         for p in pois or []
     ]
 

@@ -302,3 +302,45 @@ def test_static_map_data_uri_reads_disk_cache_without_network(monkeypatch, tmp_p
     second = geo.static_map_data_uri(50.08, 14.43)
     assert second == first
     assert calls["n"] == 0
+
+
+# --- map geometry ----------------------------------------------------------- #
+
+def test_parse_nearest_pois_keeps_coordinates():
+    payload = {"elements": [
+        _node("Albert", {"shop": "supermarket"}, dlon=0.002),
+        {"type": "way", "id": 9, "center": {"lat": _LAT + 0.002, "lon": _LON},
+         "tags": {"name": "Sady Na Skalce", "leisure": "park"}},
+    ]}
+    by_category = {p.category: p for p in geo._parse_nearest_pois(payload, _LAT, _LON)}
+
+    assert by_category["grocery"].lat == _LAT
+    assert by_category["grocery"].lon == pytest.approx(_LON + 0.002)
+    # Ways carry their position in `center`, same as the distance maths uses.
+    assert by_category["parks"].lat == pytest.approx(_LAT + 0.002)
+
+
+def test_nearest_poi_loads_from_a_cache_written_before_coordinates_existed(
+    monkeypatch, tmp_path
+):
+    import json
+
+    cache = tmp_path / f"{_LAT}_{_LON}.json"
+    cache.write_text(json.dumps(
+        [{"category": "grocery", "name": "Albert", "distance_m": 140}]
+    ))
+    monkeypatch.setattr(geo, "_pois_cache", {})
+    monkeypatch.setattr(geo.config, "LOCATION_POI_CACHE_DIR", str(tmp_path))
+
+    (poi,) = geo.fetch_nearest_pois(_LAT, _LON)
+    assert poi.name == "Albert"
+    assert poi.lat is None and poi.lon is None  # unknown, never guessed
+
+
+def test_static_map_geometry_matches_the_rendered_frame():
+    frame = geo.static_map_geometry(50.080012, 14.429987)
+
+    # The image is centred on the cache-key coordinate, not the raw one.
+    assert (frame["center_lat"], frame["center_lon"]) == (50.08, 14.43)
+    assert frame["zoom"] == geo._MAP_ZOOM
+    assert (frame["width"], frame["height"]) == (geo._MAP_W, geo._MAP_H)

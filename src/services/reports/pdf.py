@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import base64
 import logging
+import math
 from functools import lru_cache
 from pathlib import Path
 from typing import Optional
@@ -264,6 +265,65 @@ def _walk_minutes(value) -> int:
         return 1
 
 
+# Half a pictogram pin, in map pixels: a facility closer than this to the
+# frame's edge would be drawn half-clipped, so it is left off.
+_PIN_INSET_PX = 14
+_TILE_PX = 256
+
+
+def _map_markers(location, width_mm: float = 178.0) -> Optional[dict]:
+    """Project `location.nearest_facilities` onto the static map image.
+
+    Needs the frame the image was stitched in (`map_center_lat/lon`,
+    `map_zoom`, `map_width/height` — see geo.static_map_geometry) and a
+    coordinate per facility; without either, None is returned and the bare
+    map is drawn. A pictogram in the wrong street is worse than none.
+
+    Positions are percentages of the frame; `height_mm` sizes the frame to
+    the image's aspect ratio at `width_mm` (the page's content width), so no
+    `object-fit` cropping shifts the map under the pins.
+    """
+    if location is None:
+        return None
+    zoom = getattr(location, "map_zoom", None)
+    img_w = getattr(location, "map_width", None)
+    img_h = getattr(location, "map_height", None)
+    center_lat = getattr(location, "map_center_lat", None)
+    center_lon = getattr(location, "map_center_lon", None)
+    if None in (center_lat, center_lon, zoom, img_w, img_h) or not img_w or not img_h:
+        return None
+
+    def tile_frac(lat: float, lon: float) -> tuple[float, float]:
+        n = 2**int(zoom)
+        return (
+            (lon + 180.0) / 360.0 * n,
+            (1.0 - math.asinh(math.tan(math.radians(lat))) / math.pi) / 2.0 * n,
+        )
+
+    cx, cy = tile_frac(float(center_lat), float(center_lon))
+    left = cx * _TILE_PX - img_w / 2.0
+    top = cy * _TILE_PX - img_h / 2.0
+
+    markers = []
+    for facility in getattr(location, "nearest_facilities", None) or []:
+        if facility.lat is None or facility.lon is None:
+            continue
+        fx, fy = tile_frac(float(facility.lat), float(facility.lon))
+        x = fx * _TILE_PX - left
+        y = fy * _TILE_PX - top
+        if not (_PIN_INSET_PX <= x <= img_w - _PIN_INSET_PX):
+            continue
+        if not (_PIN_INSET_PX <= y <= img_h - _PIN_INSET_PX):
+            continue
+        markers.append({
+            "category": facility.category,
+            "name": facility.name,
+            "left_pct": round(x / img_w * 100, 3),
+            "top_pct": round(y / img_h * 100, 3),
+        })
+    return {"height_mm": round(width_mm * img_h / img_w, 2), "markers": markers}
+
+
 @lru_cache(maxsize=1)
 def _env() -> Environment:
     env = Environment(
@@ -284,6 +344,7 @@ def _env() -> Environment:
     env.filters["dist"] = _fmt_distance
     env.filters["walk_min"] = _walk_minutes
     env.filters["index_svg"] = _index_svg
+    env.filters["map_markers"] = _map_markers
     return env
 
 
