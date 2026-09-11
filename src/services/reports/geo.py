@@ -367,7 +367,12 @@ _BASEMAP_SATURATION = 0.0
 _BASEMAP_LIGHTEN = 0.55
 # Bump whenever the rendered map changes, to invalidate the on-disk cache.
 _MAP_STYLE_VERSION = 2
-_UA = {"User-Agent": "estima-backend-reports/1.0 (property report location section)"}
+# Overpass's front end (Apache) answers 406 Not Acceptable to User-Agent
+# strings containing parentheses — which silently cost this box every
+# nearest-facility lookup until 2026-09-11. Keep it a plain product token
+# plus a contact URL; OSM's tile policy only asks that we identify
+# ourselves, not that we do it in parentheses.
+_UA = {"User-Agent": "estima-backend-reports/1.0 +https://estima.sk"}
 
 _map_cache: dict[tuple[float, float], str] = {}
 
