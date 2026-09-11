@@ -316,10 +316,30 @@ def _location_block(report: ReportData) -> dict:
         for label, count in counts
         if count is not None
     ]
+    # The report service draws these on the map when the frame below is
+    # known, and lists them under it either way; distances are metres here
+    # and kilometres there.
+    nearest_pois = [
+        {
+            "name": f.name,
+            "category": f.category,
+            "distance_km": round(f.distance_m / 1000, 3),
+            "walking_time_min": max(1, round(f.distance_m / 80)),
+            "latitude": f.lat,
+            "longitude": f.lon,
+        }
+        for f in loc.nearest_facilities
+    ]
     return {
         "available": bool(facilities),
         "map_image_url": loc.static_map_url,
         "facilities": facilities,
+        "nearest_pois": nearest_pois,
+        "map_center_lat": loc.map_center_lat,
+        "map_center_lon": loc.map_center_lon,
+        "map_zoom": loc.map_zoom,
+        "map_width": loc.map_width,
+        "map_height": loc.map_height,
     }
 
 

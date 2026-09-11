@@ -228,6 +228,8 @@ class NearestFacility(BaseModel):
     category: str  # transport | grocery | schools | parks | restaurants | healthcare
     name: str
     distance_m: int
+    lat: Optional[float] = None  # drawn on the static map when known
+    lon: Optional[float] = None
 
 
 class LocationAnalysis(BaseModel):
@@ -235,6 +237,13 @@ class LocationAnalysis(BaseModel):
 
     available: bool = True
     static_map_url: Optional[str] = None
+    # Geometry of static_map_url (Web Mercator), so facilities with
+    # coordinates can be drawn on it instead of only counted below it.
+    map_center_lat: Optional[float] = None
+    map_center_lon: Optional[float] = None
+    map_zoom: Optional[int] = None
+    map_width: Optional[int] = None
+    map_height: Optional[int] = None
     nearby_transport_count_500m: Optional[int] = None
     nearby_grocery_count_500m: Optional[int] = None
     nearby_schools_count_1km: Optional[int] = None

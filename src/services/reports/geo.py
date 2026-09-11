@@ -188,6 +188,10 @@ class NearestPoi:
     category: str  # transport | grocery | schools | parks | restaurants | healthcare
     name: str
     distance_m: int
+    # WGS84 position, so the report can draw the facility on the static map.
+    # Optional: POI caches written before this field existed replay without it.
+    lat: float | None = None
+    lon: float | None = None
 
 
 # (category key, tag filters, radius in metres) — the six categories the
@@ -269,7 +273,13 @@ def _parse_nearest_pois(payload: dict, lat: float, lon: float) -> list[NearestPo
         distance = round(_haversine_m(lat, lon, coords["lat"], coords["lon"]))
         current = best.get(category)
         if current is None or distance < current.distance_m:
-            best[category] = NearestPoi(category=category, name=name, distance_m=distance)
+            best[category] = NearestPoi(
+                category=category,
+                name=name,
+                distance_m=distance,
+                lat=coords["lat"],
+                lon=coords["lon"],
+            )
     return [best[cat] for cat, _, _ in _POI_CATEGORIES if cat in best]
 
 
@@ -288,12 +298,17 @@ def fetch_nearest_pois(lat: float, lon: float) -> list[NearestPoi] | None:
     lookups are persisted to disk so each coordinate is queried at most once
     ever, mirroring the static-map cache. An empty list is a valid (cachable)
     answer: coordinates with no named facility in range.
+
+    A cache file written before facilities carried coordinates is re-queried
+    once (it cannot place a pin on the map), but kept as the fallback if
+    Overpass is unreachable — a stale list under the map beats an empty one.
     """
     key = (round(lat, 4), round(lon, 4))
     cached = _pois_cache.get(key)
     if cached is not None:
         return cached
 
+    stale: list[NearestPoi] | None = None
     disk_path = _pois_cache_path(key)
     if disk_path.exists():
         try:
@@ -301,7 +316,9 @@ def fetch_nearest_pois(lat: float, lon: float) -> list[NearestPoi] | None:
         except (OSError, ValueError, TypeError) as exc:
             logger.warning("Could not read cached POIs %s: %s", disk_path, exc)
         else:
-            return _remember_pois(key, pois)
+            if all(p.lat is not None and p.lon is not None for p in pois):
+                return _remember_pois(key, pois)
+            stale = pois
 
     try:
         resp = requests.post(
@@ -314,7 +331,7 @@ def fetch_nearest_pois(lat: float, lon: float) -> list[NearestPoi] | None:
         pois = _parse_nearest_pois(resp.json(), key[0], key[1])
     except (requests.RequestException, ValueError) as exc:
         logger.warning("Overpass nearest-POI lookup failed for %s: %s", key, exc)
-        return None
+        return _remember_pois(key, stale) if stale is not None else None
 
     try:
         disk_path.parent.mkdir(parents=True, exist_ok=True)
@@ -344,6 +361,12 @@ _TILE_TIMEOUT_SECONDS = 5
 # frame for the walkable-facility radii.
 _MAP_W, _MAP_H, _MAP_ZOOM = 1100, 360, 15
 _ATTRIBUTION = "© OpenStreetMap contributors"
+# Basemap wash applied before the markers are drawn (see _render_map): all
+# colour removed, then blended this far toward white.
+_BASEMAP_SATURATION = 0.0
+_BASEMAP_LIGHTEN = 0.55
+# Bump whenever the rendered map changes, to invalidate the on-disk cache.
+_MAP_STYLE_VERSION = 2
 _UA = {"User-Agent": "estima-backend-reports/1.0 (property report location section)"}
 
 _map_cache: dict[tuple[float, float], str] = {}
@@ -365,7 +388,7 @@ def _render_map(lat: float, lon: float, get) -> bytes:
     """
     # Pillow ships as a WeasyPrint dependency; imported lazily to keep the
     # counts path importable even where imaging libs are broken.
-    from PIL import Image, ImageDraw
+    from PIL import Image, ImageDraw, ImageEnhance
 
     xf, yf = _tile_frac(lat, lon, _MAP_ZOOM)
     cx, cy = xf * _TILE_PX, yf * _TILE_PX  # property in global pixel space
@@ -388,6 +411,16 @@ def _render_map(lat: float, lon: float, get) -> bytes:
     crop_x, crop_y = left - tx0 * _TILE_PX, top - ty0 * _TILE_PX
     img = canvas.crop((crop_x, crop_y, crop_x + _MAP_W, crop_y + _MAP_H))
 
+    # Wash the basemap out before anything is drawn on it. The standard OSM
+    # style paints its own POI glyphs (museums, attractions, pharmacies) into
+    # the tiles, which compete with the report's facility pictograms and
+    # confuse readers — "what are these castles?". Greyscale plus a strong
+    # lightening leaves streets and their names legible while those glyphs
+    # recede, and makes the markers drawn below the only saturated things on
+    # the map.
+    img = ImageEnhance.Color(img).enhance(_BASEMAP_SATURATION)
+    img = Image.blend(img, Image.new("RGB", img.size, (255, 255, 255)), _BASEMAP_LIGHTEN)
+
     draw = ImageDraw.Draw(img)
     px, py = int(cx - left), int(cy - top)
     draw.ellipse((px - 12, py - 12, px + 12, py + 12), fill=(255, 255, 255))
@@ -407,7 +440,15 @@ def _render_map(lat: float, lon: float, get) -> bytes:
 
 
 def _map_cache_path(key: tuple[float, float]) -> Path:
-    return Path(config.LOCATION_MAP_CACHE_DIR) / f"{key[0]}_{key[1]}.png"
+    # The style version is part of the name: a cached image is a *rendered*
+    # map, so changing how it is rendered (see _BASEMAP_* above) has to miss
+    # the cache rather than serve the old look forever. Superseded files are
+    # simply left behind — deleting them is a housekeeping job, not a
+    # report-generation one.
+    return (
+        Path(config.LOCATION_MAP_CACHE_DIR)
+        / f"{key[0]}_{key[1]}_v{_MAP_STYLE_VERSION}.png"
+    )
 
 
 def static_map_data_uri(lat: float, lon: float) -> str | None:
@@ -445,6 +486,22 @@ def static_map_data_uri(lat: float, lon: float) -> str | None:
         logger.warning("Could not persist map cache %s: %s", disk_path, exc)
 
     return _remember_map(key, png)
+
+
+def static_map_geometry(lat: float, lon: float) -> dict:
+    """The frame `static_map_data_uri` renders for this coordinate.
+
+    Reported alongside the image so a consumer can place its own markers on
+    it (Web Mercator, centred on the *cache key* coordinate — the rounding
+    below is what the rendered tiles are actually centred on, up to ~11 m).
+    """
+    return {
+        "center_lat": round(lat, 4),
+        "center_lon": round(lon, 4),
+        "zoom": _MAP_ZOOM,
+        "width": _MAP_W,
+        "height": _MAP_H,
+    }
 
 
 def _remember_map(key: tuple[float, float], png: bytes) -> str:

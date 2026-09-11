@@ -236,6 +236,35 @@ def test_render_map_produces_correctly_sized_png():
     assert img.size == (geo._MAP_W, geo._MAP_H)
 
 
+def test_render_map_washes_the_basemap_but_not_the_marker():
+    """The tile style's own POI glyphs must recede behind the report's pins."""
+    pytest.importorskip("PIL")
+    from io import BytesIO
+
+    from PIL import Image
+
+    img = Image.open(BytesIO(geo._render_map(50.08, 14.43, _fake_tile_get))).convert("RGB")
+
+    # The fake tile is a bluish grey (200, 210, 220): greyscaled and lightened.
+    r, g, b = img.getpixel((40, 40))
+    assert r == g == b
+    assert r > 220
+
+    # The subject marker is drawn after the wash, so it keeps its red.
+    red = img.getpixel((geo._MAP_W // 2 - 7, geo._MAP_H // 2))
+    assert red[0] > red[1] + 80 and red[0] > red[2] + 80
+
+
+def test_map_cache_path_carries_the_style_version(monkeypatch, tmp_path):
+    """A restyled map must miss the cache instead of serving the old look."""
+    monkeypatch.setattr(geo.config, "LOCATION_MAP_CACHE_DIR", str(tmp_path))
+    path = geo._map_cache_path((50.08, 14.43))
+
+    assert path.name == f"50.08_14.43_v{geo._MAP_STYLE_VERSION}.png"
+    # The pre-versioning name is not read back.
+    assert path.name != "50.08_14.43.png"
+
+
 def test_static_map_data_uri_failure_returns_none(monkeypatch, tmp_path):
     def boom(*args, **kwargs):
         raise requests.ConnectionError("tiles down")
@@ -302,3 +331,79 @@ def test_static_map_data_uri_reads_disk_cache_without_network(monkeypatch, tmp_p
     second = geo.static_map_data_uri(50.08, 14.43)
     assert second == first
     assert calls["n"] == 0
+
+
+def _no_network(*args, **kwargs):
+    raise requests.ConnectionError("overpass down")
+
+
+# --- map geometry ----------------------------------------------------------- #
+
+def test_parse_nearest_pois_keeps_coordinates():
+    payload = {"elements": [
+        _node("Albert", {"shop": "supermarket"}, dlon=0.002),
+        {"type": "way", "id": 9, "center": {"lat": _LAT + 0.002, "lon": _LON},
+         "tags": {"name": "Sady Na Skalce", "leisure": "park"}},
+    ]}
+    by_category = {p.category: p for p in geo._parse_nearest_pois(payload, _LAT, _LON)}
+
+    assert by_category["grocery"].lat == _LAT
+    assert by_category["grocery"].lon == pytest.approx(_LON + 0.002)
+    # Ways carry their position in `center`, same as the distance maths uses.
+    assert by_category["parks"].lat == pytest.approx(_LAT + 0.002)
+
+
+def _write_pre_coordinates_cache(tmp_path):
+    import json
+
+    (tmp_path / f"{_LAT}_{_LON}.json").write_text(
+        json.dumps([{"category": "grocery", "name": "Albert", "distance_m": 140}])
+    )
+
+
+def test_cache_without_coordinates_is_requeried_once(monkeypatch, tmp_path):
+    """A pre-coordinates cache entry cannot place a pin, so it is refreshed."""
+
+    class FakeResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"elements": [_node("Albert", {"shop": "supermarket"}, dlon=0.002)]}
+
+    _write_pre_coordinates_cache(tmp_path)
+    monkeypatch.setattr(geo, "_pois_cache", {})
+    monkeypatch.setattr(geo.config, "LOCATION_POI_CACHE_DIR", str(tmp_path))
+    monkeypatch.setattr(geo.requests, "post", lambda *a, **kw: FakeResponse())
+
+    (poi,) = geo.fetch_nearest_pois(_LAT, _LON)
+    assert poi.lat is not None and poi.lon is not None
+
+    # The refreshed answer replaces the coordinate-less file on disk.
+    monkeypatch.setattr(geo, "_pois_cache", {})
+    monkeypatch.setattr(geo.requests, "post", _no_network)
+    (again,) = geo.fetch_nearest_pois(_LAT, _LON)
+    assert (again.lat, again.lon) == (poi.lat, poi.lon)
+
+
+def test_cache_without_coordinates_survives_an_unreachable_overpass(
+    monkeypatch, tmp_path
+):
+    """A stale list under the map beats no facilities at all."""
+    _write_pre_coordinates_cache(tmp_path)
+    monkeypatch.setattr(geo, "_pois_cache", {})
+    monkeypatch.setattr(geo.config, "LOCATION_POI_CACHE_DIR", str(tmp_path))
+    monkeypatch.setattr(geo.requests, "post", _no_network)
+
+    (poi,) = geo.fetch_nearest_pois(_LAT, _LON)
+    assert poi.name == "Albert"
+    assert poi.lat is None and poi.lon is None  # unknown, never guessed
+
+
+def test_static_map_geometry_matches_the_rendered_frame():
+    frame = geo.static_map_geometry(50.080012, 14.429987)
+
+    # The image is centred on the cache-key coordinate, not the raw one.
+    assert (frame["center_lat"], frame["center_lon"]) == (50.08, 14.43)
+    assert frame["zoom"] == geo._MAP_ZOOM
+    assert (frame["width"], frame["height"]) == (geo._MAP_W, geo._MAP_H)

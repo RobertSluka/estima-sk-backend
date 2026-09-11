@@ -12,7 +12,9 @@ from src.services.reports import nbs, payload
 from src.services.reports.schema import (
     Comparable,
     DealType,
+    LocationAnalysis,
     MarketAnalysis,
+    NearestFacility,
     Property,
     Recommendation,
     ReportData,
@@ -240,3 +242,41 @@ def test_assemble_buy_vs_rent_omitted_without_rent_data_or_for_rent_listings():
         rent_report, _row(), distribution=None, rent_distribution=_rent_distribution()
     )
     assert doc["buy_vs_rent"] is None
+
+
+def test_assemble_location_forwards_map_frame_and_facility_coordinates():
+    """The report service can only draw pins it is given coordinates for."""
+    report = _report()
+    report.location_analysis = LocationAnalysis(
+        available=True,
+        static_map_url="data:image/png;base64,AAAA",
+        map_center_lat=48.7164,
+        map_center_lon=21.2611,
+        map_zoom=15,
+        map_width=1100,
+        map_height=360,
+        nearby_transport_count_500m=22,
+        nearest_facilities=[
+            NearestFacility(
+                category="grocery",
+                name="Diskont u hrocha",
+                distance_m=154,
+                lat=48.717741,
+                lon=21.261632,
+            ),
+            # No coordinates (an older POI cache): still listed, never drawn.
+            NearestFacility(category="schools", name="Diamond English", distance_m=244),
+        ],
+    )
+
+    block = payload.assemble(report, _row(), distribution=None)["location_facilities"]
+
+    assert block["map_zoom"] == 15
+    assert (block["map_width"], block["map_height"]) == (1100, 360)
+    assert (block["map_center_lat"], block["map_center_lon"]) == (48.7164, 21.2611)
+
+    grocery, school = block["nearest_pois"]
+    assert grocery["distance_km"] == 0.154  # metres upstream, km in the payload
+    assert grocery["walking_time_min"] == 2
+    assert (grocery["latitude"], grocery["longitude"]) == (48.717741, 21.261632)
+    assert school["latitude"] is None and school["longitude"] is None
