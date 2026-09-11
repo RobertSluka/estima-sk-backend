@@ -304,6 +304,10 @@ def test_static_map_data_uri_reads_disk_cache_without_network(monkeypatch, tmp_p
     assert calls["n"] == 0
 
 
+def _no_network(*args, **kwargs):
+    raise requests.ConnectionError("overpass down")
+
+
 # --- map geometry ----------------------------------------------------------- #
 
 def test_parse_nearest_pois_keeps_coordinates():
@@ -320,17 +324,47 @@ def test_parse_nearest_pois_keeps_coordinates():
     assert by_category["parks"].lat == pytest.approx(_LAT + 0.002)
 
 
-def test_nearest_poi_loads_from_a_cache_written_before_coordinates_existed(
-    monkeypatch, tmp_path
-):
+def _write_pre_coordinates_cache(tmp_path):
     import json
 
-    cache = tmp_path / f"{_LAT}_{_LON}.json"
-    cache.write_text(json.dumps(
-        [{"category": "grocery", "name": "Albert", "distance_m": 140}]
-    ))
+    (tmp_path / f"{_LAT}_{_LON}.json").write_text(
+        json.dumps([{"category": "grocery", "name": "Albert", "distance_m": 140}])
+    )
+
+
+def test_cache_without_coordinates_is_requeried_once(monkeypatch, tmp_path):
+    """A pre-coordinates cache entry cannot place a pin, so it is refreshed."""
+
+    class FakeResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return {"elements": [_node("Albert", {"shop": "supermarket"}, dlon=0.002)]}
+
+    _write_pre_coordinates_cache(tmp_path)
     monkeypatch.setattr(geo, "_pois_cache", {})
     monkeypatch.setattr(geo.config, "LOCATION_POI_CACHE_DIR", str(tmp_path))
+    monkeypatch.setattr(geo.requests, "post", lambda *a, **kw: FakeResponse())
+
+    (poi,) = geo.fetch_nearest_pois(_LAT, _LON)
+    assert poi.lat is not None and poi.lon is not None
+
+    # The refreshed answer replaces the coordinate-less file on disk.
+    monkeypatch.setattr(geo, "_pois_cache", {})
+    monkeypatch.setattr(geo.requests, "post", _no_network)
+    (again,) = geo.fetch_nearest_pois(_LAT, _LON)
+    assert (again.lat, again.lon) == (poi.lat, poi.lon)
+
+
+def test_cache_without_coordinates_survives_an_unreachable_overpass(
+    monkeypatch, tmp_path
+):
+    """A stale list under the map beats no facilities at all."""
+    _write_pre_coordinates_cache(tmp_path)
+    monkeypatch.setattr(geo, "_pois_cache", {})
+    monkeypatch.setattr(geo.config, "LOCATION_POI_CACHE_DIR", str(tmp_path))
+    monkeypatch.setattr(geo.requests, "post", _no_network)
 
     (poi,) = geo.fetch_nearest_pois(_LAT, _LON)
     assert poi.name == "Albert"

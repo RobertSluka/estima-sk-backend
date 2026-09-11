@@ -298,12 +298,17 @@ def fetch_nearest_pois(lat: float, lon: float) -> list[NearestPoi] | None:
     lookups are persisted to disk so each coordinate is queried at most once
     ever, mirroring the static-map cache. An empty list is a valid (cachable)
     answer: coordinates with no named facility in range.
+
+    A cache file written before facilities carried coordinates is re-queried
+    once (it cannot place a pin on the map), but kept as the fallback if
+    Overpass is unreachable — a stale list under the map beats an empty one.
     """
     key = (round(lat, 4), round(lon, 4))
     cached = _pois_cache.get(key)
     if cached is not None:
         return cached
 
+    stale: list[NearestPoi] | None = None
     disk_path = _pois_cache_path(key)
     if disk_path.exists():
         try:
@@ -311,7 +316,9 @@ def fetch_nearest_pois(lat: float, lon: float) -> list[NearestPoi] | None:
         except (OSError, ValueError, TypeError) as exc:
             logger.warning("Could not read cached POIs %s: %s", disk_path, exc)
         else:
-            return _remember_pois(key, pois)
+            if all(p.lat is not None and p.lon is not None for p in pois):
+                return _remember_pois(key, pois)
+            stale = pois
 
     try:
         resp = requests.post(
@@ -324,7 +331,7 @@ def fetch_nearest_pois(lat: float, lon: float) -> list[NearestPoi] | None:
         pois = _parse_nearest_pois(resp.json(), key[0], key[1])
     except (requests.RequestException, ValueError) as exc:
         logger.warning("Overpass nearest-POI lookup failed for %s: %s", key, exc)
-        return None
+        return _remember_pois(key, stale) if stale is not None else None
 
     try:
         disk_path.parent.mkdir(parents=True, exist_ok=True)
