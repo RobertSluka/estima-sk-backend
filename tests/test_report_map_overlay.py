@@ -45,8 +45,8 @@ def test_map_markers_projects_facilities_onto_the_frame():
     (marker,) = overlay["markers"]
     assert marker["category"] == "healthcare"
     # 45 m west and a little south of the centred property, at ~3.15 m/px.
-    assert 48.0 < marker["left_pct"] < 50.0
-    assert 50.0 < marker["top_pct"] < 51.5
+    assert 48.0 < marker["anchor_left_pct"] < 50.0
+    assert 50.0 < marker["anchor_top_pct"] < 51.5
 
 
 def test_map_markers_is_all_or_nothing_without_geometry():
@@ -81,3 +81,54 @@ def test_map_markers_drops_facilities_outside_the_frame():
         )
     )
     assert overlay["markers"] == []
+
+
+def test_map_markers_moves_pins_off_the_subject_marker():
+    """A facility this close would otherwise be drawn over the property dot."""
+    (marker,) = _map_markers(_location())["markers"]
+
+    # The anchor keeps the true position; only the pictogram moves, and the
+    # callout line says by how much and in which direction.
+    assert marker["offset"] is True
+    assert marker["left_pct"] < marker["anchor_left_pct"]
+    assert 0 < marker["lead_length_mm"] < 6
+
+
+def test_map_markers_leaves_uncrowded_pins_where_they_are():
+    overlay = _map_markers(
+        _location(
+            nearest_facilities=[
+                NearestFacility(
+                    category="parks",
+                    name="Stromovka",
+                    distance_m=350,
+                    lat=_LAT + 0.003,
+                    lon=_LON + 0.003,
+                )
+            ]
+        )
+    )
+    (marker,) = overlay["markers"]
+
+    assert marker["offset"] is False
+    assert marker["left_pct"] == marker["anchor_left_pct"]
+    assert marker["top_pct"] == marker["anchor_top_pct"]
+
+
+def test_map_markers_separates_facilities_that_share_a_spot():
+    """Two facilities at the same coordinate must not stack into one pin."""
+    a, b = _map_markers(
+        _location(
+            nearest_facilities=[
+                NearestFacility(category="grocery", name="A", distance_m=300,
+                                lat=_LAT + 0.003, lon=_LON + 0.003),
+                NearestFacility(category="restaurants", name="B", distance_m=300,
+                                lat=_LAT + 0.003, lon=_LON + 0.003),
+            ]
+        )
+    )["markers"]
+
+    assert a["anchor_left_pct"] == b["anchor_left_pct"]
+    # Drawn apart by at least a pin's width (28px of 1100 = 2.5% of the frame).
+    assert abs(a["left_pct"] - b["left_pct"]) + abs(a["top_pct"] - b["top_pct"]) > 2.0
+    assert a["offset"] and b["offset"]

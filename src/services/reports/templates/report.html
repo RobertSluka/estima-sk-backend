@@ -303,6 +303,16 @@
     color: var(--brand); text-align: center;
   }
   .map-pin svg { width: 2.6mm; height: 2.6mm; margin-top: .7mm; }
+  /* Callout for a pin that had to move to stay readable: a dot on the real
+     position, a hairline to the pictogram. */
+  .map-anchor {
+    position: absolute; width: 1.4mm; height: 1.4mm; margin: -.7mm 0 0 -.7mm;
+    border-radius: 50%; background: var(--brand); border: .2mm solid #fff;
+  }
+  .map-lead {
+    position: absolute; height: .35mm; margin-top: -.175mm;
+    background: var(--brand); transform-origin: left center;
+  }
   /* Repeat of the marker the map image already carries, drawn last so a
      facility pin a few metres away cannot hide the subject property. */
   .map-home {
@@ -635,6 +645,11 @@
     {% if r.location_analysis.static_map_url and map_overlay %}
       <div class="map-frame" style="height:{{ map_overlay.height_mm }}mm">
         <img src="{{ r.location_analysis.static_map_url | embed_image }}" alt="Map">
+        {# Callouts first, so every pictogram sits above every hairline. #}
+        {% for m in map_overlay.markers if m.offset %}
+        <span class="map-lead" style="left:{{ m.anchor_left_pct }}%; top:{{ m.anchor_top_pct }}%; width:{{ m.lead_length_mm }}mm; transform:rotate({{ m.lead_angle_deg }}deg)"></span>
+        <span class="map-anchor" style="left:{{ m.anchor_left_pct }}%; top:{{ m.anchor_top_pct }}%"></span>
+        {% endfor %}
         {% for m in map_overlay.markers %}
         <span class="map-pin" style="left:{{ m.left_pct }}%; top:{{ m.top_pct }}%">{{ poi_icon(m.category) }}</span>
         {% endfor %}
