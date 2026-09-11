@@ -236,6 +236,35 @@ def test_render_map_produces_correctly_sized_png():
     assert img.size == (geo._MAP_W, geo._MAP_H)
 
 
+def test_render_map_washes_the_basemap_but_not_the_marker():
+    """The tile style's own POI glyphs must recede behind the report's pins."""
+    pytest.importorskip("PIL")
+    from io import BytesIO
+
+    from PIL import Image
+
+    img = Image.open(BytesIO(geo._render_map(50.08, 14.43, _fake_tile_get))).convert("RGB")
+
+    # The fake tile is a bluish grey (200, 210, 220): greyscaled and lightened.
+    r, g, b = img.getpixel((40, 40))
+    assert r == g == b
+    assert r > 220
+
+    # The subject marker is drawn after the wash, so it keeps its red.
+    red = img.getpixel((geo._MAP_W // 2 - 7, geo._MAP_H // 2))
+    assert red[0] > red[1] + 80 and red[0] > red[2] + 80
+
+
+def test_map_cache_path_carries_the_style_version(monkeypatch, tmp_path):
+    """A restyled map must miss the cache instead of serving the old look."""
+    monkeypatch.setattr(geo.config, "LOCATION_MAP_CACHE_DIR", str(tmp_path))
+    path = geo._map_cache_path((50.08, 14.43))
+
+    assert path.name == f"50.08_14.43_v{geo._MAP_STYLE_VERSION}.png"
+    # The pre-versioning name is not read back.
+    assert path.name != "50.08_14.43.png"
+
+
 def test_static_map_data_uri_failure_returns_none(monkeypatch, tmp_path):
     def boom(*args, **kwargs):
         raise requests.ConnectionError("tiles down")

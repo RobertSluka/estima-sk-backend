@@ -361,6 +361,12 @@ _TILE_TIMEOUT_SECONDS = 5
 # frame for the walkable-facility radii.
 _MAP_W, _MAP_H, _MAP_ZOOM = 1100, 360, 15
 _ATTRIBUTION = "© OpenStreetMap contributors"
+# Basemap wash applied before the markers are drawn (see _render_map): all
+# colour removed, then blended this far toward white.
+_BASEMAP_SATURATION = 0.0
+_BASEMAP_LIGHTEN = 0.55
+# Bump whenever the rendered map changes, to invalidate the on-disk cache.
+_MAP_STYLE_VERSION = 2
 _UA = {"User-Agent": "estima-backend-reports/1.0 (property report location section)"}
 
 _map_cache: dict[tuple[float, float], str] = {}
@@ -382,7 +388,7 @@ def _render_map(lat: float, lon: float, get) -> bytes:
     """
     # Pillow ships as a WeasyPrint dependency; imported lazily to keep the
     # counts path importable even where imaging libs are broken.
-    from PIL import Image, ImageDraw
+    from PIL import Image, ImageDraw, ImageEnhance
 
     xf, yf = _tile_frac(lat, lon, _MAP_ZOOM)
     cx, cy = xf * _TILE_PX, yf * _TILE_PX  # property in global pixel space
@@ -405,6 +411,16 @@ def _render_map(lat: float, lon: float, get) -> bytes:
     crop_x, crop_y = left - tx0 * _TILE_PX, top - ty0 * _TILE_PX
     img = canvas.crop((crop_x, crop_y, crop_x + _MAP_W, crop_y + _MAP_H))
 
+    # Wash the basemap out before anything is drawn on it. The standard OSM
+    # style paints its own POI glyphs (museums, attractions, pharmacies) into
+    # the tiles, which compete with the report's facility pictograms and
+    # confuse readers — "what are these castles?". Greyscale plus a strong
+    # lightening leaves streets and their names legible while those glyphs
+    # recede, and makes the markers drawn below the only saturated things on
+    # the map.
+    img = ImageEnhance.Color(img).enhance(_BASEMAP_SATURATION)
+    img = Image.blend(img, Image.new("RGB", img.size, (255, 255, 255)), _BASEMAP_LIGHTEN)
+
     draw = ImageDraw.Draw(img)
     px, py = int(cx - left), int(cy - top)
     draw.ellipse((px - 12, py - 12, px + 12, py + 12), fill=(255, 255, 255))
@@ -424,7 +440,15 @@ def _render_map(lat: float, lon: float, get) -> bytes:
 
 
 def _map_cache_path(key: tuple[float, float]) -> Path:
-    return Path(config.LOCATION_MAP_CACHE_DIR) / f"{key[0]}_{key[1]}.png"
+    # The style version is part of the name: a cached image is a *rendered*
+    # map, so changing how it is rendered (see _BASEMAP_* above) has to miss
+    # the cache rather than serve the old look forever. Superseded files are
+    # simply left behind — deleting them is a housekeeping job, not a
+    # report-generation one.
+    return (
+        Path(config.LOCATION_MAP_CACHE_DIR)
+        / f"{key[0]}_{key[1]}_v{_MAP_STYLE_VERSION}.png"
+    )
 
 
 def static_map_data_uri(lat: float, lon: float) -> str | None:
